@@ -970,6 +970,7 @@ td.col-attributes {
 }
 
 @media (max-width: 1080px) {
+
   .hero,
   .toolbar,
   .table-wrapper,
@@ -1062,7 +1063,13 @@ td.col-attributes {
 
 @media (max-width: 540px) {
   body {
-    padding: clamp(10px, 4vw, 18px);
+    padding: clamp(8px, 3vw, 16px);
+    /* 减小padding，为小屏幕留出更多空间 */
+  }
+
+  .app-shell {
+    padding: 0 clamp(8px, 2vw, 12px);
+    /* 减小左右内边距，确保居中 */
   }
 
   .hero {
@@ -1093,6 +1100,62 @@ td.col-attributes {
   }
 }
 
+/* iPhone 13等390px宽度设备专门优化 */
+@media (max-width: 400px) {
+  body {
+    padding: clamp(6px, 2.5vw, 12px);
+    /* 进一步减小外边距 */
+  }
+
+  .app-shell {
+    padding: 0 clamp(6px, 1.5vw, 10px);
+    /* 更小的内边距，确保内容居中 */
+  }
+
+  .hero {
+    padding: clamp(12px, 4vw, 20px);
+  }
+
+  .toolbar {
+    padding: clamp(8px, 3vw, 12px);
+    gap: clamp(6px, 2vw, 10px);
+    /* 减小间距节省空间 */
+  }
+
+  .toolbar-button,
+  .toolbar-icon,
+  .table-gear {
+    border-radius: 10px;
+    min-height: 36px;
+    /* 稍微减小按钮高度 */
+  }
+
+  .search input {
+    font-size: 14px;
+    /* 优化搜索框字体大小 */
+  }
+
+  .table-scroll table {
+    min-width: 350px;
+    /* 减小表格最小宽度，适应390px屏幕 */
+  }
+
+  .table-wrapper {
+    border-radius: 14px;
+    /* 稍微减小圆角 */
+  }
+
+  .table-footer {
+    padding: 12px;
+    /* 减小footer内边距 */
+  }
+
+  .column-popover {
+    width: 160px;
+    /* 减小列设置弹窗宽度 */
+  }
+}
+
 @media (max-width: 420px) {
   .table-scroll table {
     min-width: 360px;
@@ -1100,6 +1163,291 @@ td.col-attributes {
 
   .page-jump input {
     width: 64px;
+  }
+}
+
+/* ==================== 动态列宽系统 ==================== */
+
+/* 确保列隐藏功能在所有媒体查询中都能正常工作 */
+th.hidden-column,
+td.hidden-column,
+.hidden-column {
+  display: none !important;
+}
+
+/* 当所有6列都显示时的默认布局 */
+.table-columns-all th.col-file,
+.table-columns-all td.col-file {
+  width: 25%;
+}
+
+.table-columns-all th.col-path,
+.table-columns-all td.col-path {
+  width: 25%;
+}
+
+.table-columns-all th.col-size,
+.table-columns-all td.col-size {
+  width: 12%;
+}
+
+.table-columns-all th.col-modified,
+.table-columns-all td.col-modified {
+  width: 15%;
+}
+
+.table-columns-all th.col-created,
+.table-columns-all td.col-created {
+  width: 15%;
+}
+
+.table-columns-all th.col-attributes,
+.table-columns-all td.col-attributes {
+  width: 8%;
+}
+
+/* 当隐藏创建时间列时 (5列显示) */
+.table-columns-no-created th.col-file,
+.table-columns-no-created td.col-file {
+  width: 30%;
+}
+
+.table-columns-no-created th.col-path,
+.table-columns-no-created td.col-path {
+  width: 30%;
+}
+
+.table-columns-no-created th.col-size,
+.table-columns-no-created td.col-size {
+  width: 15%;
+}
+
+.table-columns-no-created th.col-modified,
+.table-columns-no-created td.col-modified {
+  width: 18%;
+}
+
+.table-columns-no-created th.col-attributes,
+.table-columns-no-created td.col-attributes {
+  width: 7%;
+}
+
+/* 当隐藏属性列时 (5列显示) */
+.table-columns-no-attributes th.col-file,
+.table-columns-no-attributes td.col-file {
+  width: 28%;
+}
+
+.table-columns-no-attributes th.col-path,
+.table-columns-no-attributes td.col-path {
+  width: 28%;
+}
+
+.table-columns-no-attributes th.col-size,
+.table-columns-no-attributes td.col-size {
+  width: 14%;
+}
+
+.table-columns-no-attributes th.col-modified,
+.table-columns-no-attributes td.col-modified {
+  width: 15%;
+}
+
+.table-columns-no-attributes th.col-created,
+.table-columns-no-attributes td.col-created {
+  width: 15%;
+}
+
+/* 当隐藏大小列时 (5列显示) */
+.table-columns-no-size th.col-file,
+.table-columns-no-size td.col-file {
+  width: 30%;
+}
+
+.table-columns-no-size th.col-path,
+.table-columns-no-size td.col-path {
+  width: 30%;
+}
+
+.table-columns-no-size th.col-modified,
+.table-columns-no-size td.col-modified {
+  width: 17%;
+}
+
+.table-columns-no-size th.col-created,
+.table-columns-no-size td.col-created {
+  width: 17%;
+}
+
+.table-columns-no-size th.col-attributes,
+.table-columns-no-size td.col-attributes {
+  width: 6%;
+}
+
+/* 当只隐藏创建时间和属性列时 (4列显示) */
+.table-columns-no-created-attributes th.col-file,
+.table-columns-no-created-attributes td.col-file {
+  width: 35%;
+}
+
+.table-columns-no-created-attributes th.col-path,
+.table-columns-no-created-attributes td.col-path {
+  width: 35%;
+}
+
+.table-columns-no-created-attributes th.col-size,
+.table-columns-no-created-attributes td.col-size {
+  width: 15%;
+}
+
+.table-columns-no-created-attributes th.col-modified,
+.table-columns-no-created-attributes td.col-modified {
+  width: 15%;
+}
+
+/* 当只显示核心3列时 (文件名、路径、修改时间) */
+.table-columns-core th.col-file,
+.table-columns-core td.col-file {
+  width: 40%;
+}
+
+.table-columns-core th.col-path,
+.table-columns-core td.col-path {
+  width: 40%;
+}
+
+.table-columns-core th.col-modified,
+.table-columns-core td.col-modified {
+  width: 20%;
+}
+
+/* 当只显示最简2列时 (文件名、路径) */
+.table-columns-minimal th.col-file,
+.table-columns-minimal td.col-file {
+  width: 50%;
+}
+
+.table-columns-minimal th.col-path,
+.table-columns-minimal td.col-path {
+  width: 50%;
+}
+
+/* 小屏幕下的动态列宽优化 */
+@media (max-width: 540px) {
+
+  .table-columns-all th.col-file,
+  .table-columns-all td.col-file {
+    width: 28%;
+    min-width: 100px;
+  }
+
+  .table-columns-all th.col-path,
+  .table-columns-all td.col-path {
+    width: 28%;
+    min-width: 100px;
+  }
+
+  .table-columns-all th.col-size,
+  .table-columns-all td.col-size {
+    width: 12%;
+    min-width: 50px;
+  }
+
+  .table-columns-all th.col-modified,
+  .table-columns-all td.col-modified {
+    width: 16%;
+    min-width: 80px;
+  }
+
+  .table-columns-all th.col-created,
+  .table-columns-all td.col-created {
+    width: 16%;
+    min-width: 80px;
+  }
+
+  .table-columns-all th.col-attributes,
+  .table-columns-all td.col-attributes {
+    width: 10%;
+    min-width: 40px;
+  }
+
+  .table-columns-core th.col-file,
+  .table-columns-core td.col-file {
+    width: 45%;
+  }
+
+  .table-columns-core th.col-path,
+  .table-columns-core td.col-path {
+    width: 35%;
+  }
+
+  .table-columns-core th.col-modified,
+  .table-columns-core td.col-modified {
+    width: 20%;
+  }
+}
+
+@media (max-width: 400px) {
+
+  .table-columns-all th.col-file,
+  .table-columns-all td.col-file {
+    width: 26%;
+    min-width: 80px;
+  }
+
+  .table-columns-all th.col-path,
+  .table-columns-all td.col-path {
+    width: 26%;
+    min-width: 80px;
+  }
+
+  .table-columns-all th.col-size,
+  .table-columns-all td.col-size {
+    width: 12%;
+    min-width: 45px;
+  }
+
+  .table-columns-all th.col-modified,
+  .table-columns-all td.col-modified {
+    width: 18%;
+    min-width: 70px;
+  }
+
+  .table-columns-all th.col-created,
+  .table-columns-all td.col-created {
+    width: 12%;
+    min-width: 45px;
+  }
+
+  .table-columns-all th.col-attributes,
+  .table-columns-all td.col-attributes {
+    width: 6%;
+    min-width: 30px;
+  }
+
+  .table-columns-core th.col-file,
+  .table-columns-core td.col-file {
+    width: 50%;
+  }
+
+  .table-columns-core th.col-path,
+  .table-columns-core td.col-path {
+    width: 30%;
+  }
+
+  .table-columns-core th.col-modified,
+  .table-columns-core td.col-modified {
+    width: 20%;
+  }
+
+  .table-columns-minimal th.col-file,
+  .table-columns-minimal td.col-file {
+    width: 60%;
+  }
+
+  .table-columns-minimal th.col-path,
+  .table-columns-minimal td.col-path {
+    width: 40%;
   }
 }
 
