@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Everything 文件浏览器</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div class="hero-text">
+        <h1>Everything 文件浏览器</h1>
+        <p>快速浏览与搜索 Everything 导出的列表，享受丝滑体验。</p>
+        <p class="active-source">当前数据源：<span id="active-source">尚未加载</span></p>
+      </div>
+      <div class="hero-meta">
+        <div class="metric">
+          <span class="metric-label">总文件数</span>
+          <span class="metric-value" id="total-count">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">已筛选</span>
+          <span class="metric-value" id="filtered-count">—</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">全部文件大小</span>
+          <span class="metric-value" id="filtered-size">—</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="toolbar">
+      <button id="open-source" class="toolbar-button" type="button" aria-label="加载数据源">＋</button>
+      <button id="close-current" class="toolbar-button" type="button" aria-label="关闭当前文件"
+        style="display: none;">−</button>
+      <div class="search">
+        <div class="search-box">
+          <span class="icon" aria-hidden="true">🔍</span>
+          <input id="search-input" type="search" placeholder="关键字示例：*.mp4 !H:\\ file:report path:\\project"
+            autocomplete="off" />
+          <button id="clear-search" aria-label="清除搜索">✕</button>
+        </div>
+        <p id="search-error" class="search-error hidden"></p>
+      </div>
+      <button id="open-settings" class="toolbar-icon" type="button" aria-label="打开设置">⚙️</button>
+      <div id="upload-progress" class="upload-progress hidden" aria-hidden="true">
+        <div class="progress-track">
+          <div id="upload-progress-bar" class="progress-bar"></div>
+        </div>
+        <span id="upload-progress-text">0%</span>
+      </div>
+    </section>
+
+    <div id="dialog-overlay" class="overlay hidden"></div>
+
+    <div id="source-panel" class="panel hidden" role="dialog" aria-modal="true" aria-labelledby="source-title">
+      <div class="panel-header">
+        <h2 id="source-title">数据源</h2>
+        <button type="button" class="panel-close" id="close-source" aria-label="关闭">✕</button>
+      </div>
+      <div class="panel-body">
+        <p class="panel-hint">默认从 <code>/efu</code> 目录读取所有 <code>.efu</code> 文件，可手动上传单个文件。</p>
+        <div class="panel-block">
+          <label class="panel-label" for="file-selector">选择目录中的 EFU 文件</label>
+          <div class="select-group">
+            <select id="file-selector">
+              <option value="">— 浏览目录中的 EFU —</option>
+            </select>
+            <button id="load-selected" type="button" disabled>载入</button>
+          </div>
+        </div>
+        <div class="panel-block">
+          <label class="panel-label">本地 EFU 文件</label>
+          <div class="upload-group">
+            <input type="file" id="file-upload" accept=".efu" hidden />
+            <button id="upload-trigger" type="button">打开文件</button>
+            <span id="upload-name" class="upload-name">选择 .efu 文件进行浏览</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="settings-panel" class="panel hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="panel-header">
+        <h2 id="settings-title">设置</h2>
+        <button type="button" class="panel-close" id="close-settings" aria-label="关闭">✕</button>
+      </div>
+      <div class="panel-body">
+        <section class="panel-section">
+          <h3>主题风格</h3>
+          <div class="theme-options">
+            <button type="button" class="theme-option" data-theme-option="light">
+              <span class="theme-icon">☀️</span>
+              <span class="theme-label">明亮</span>
+            </button>
+            <button type="button" class="theme-option" data-theme-option="dark">
+              <span class="theme-icon">🌙</span>
+              <span class="theme-label">暗黑</span>
+            </button>
+            <button type="button" class="theme-option" data-theme-option="mac">
+              <span class="theme-icon">🍎</span>
+              <span class="theme-label">macOS 26</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <h3>搜索行为</h3>
+          <label class="panel-toggle">
+            <input type="checkbox" id="toggle-regex" />
+            <span>使用正则表达式（Everything 语法）</span>
+          </label>
+          <label class="panel-toggle">
+            <input type="checkbox" id="toggle-include-dirs" />
+            <span>包含目录结果</span>
+          </label>
+          <label class="panel-toggle">
+            <input type="checkbox" id="toggle-case-sensitive" />
+            <span>大小写敏感</span>
+          </label>
+        </section>
+      </div>
+    </div>
+
+    <section class="table-wrapper" id="table-wrapper">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-file" data-sort="FileName">文件名</th>
+              <th class="col-path" data-sort="Path">路径</th>
+              <th class="col-size" data-sort="Size">大小</th>
+              <th class="col-modified" data-sort="Date Modified">修改时间</th>
+              <th class="col-created" data-sort="Date Created">创建时间</th>
+              <th class="col-attributes" data-sort="Attributes">属性</th>
+            </tr>
+          </thead>
+          <tbody id="results"></tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <div class="pagination">
+          <button id="prev-page" type="button">上一页</button>
+          <span class="page-info">
+            第 <span id="current-page">0</span> / <span id="total-pages">0</span> 页
+          </span>
+          <button id="next-page" type="button">下一页</button>
+          <label class="page-jump">
+            跳转
+            <input id="page-jump" type="number" min="1" step="1" />
+          </label>
+        </div>
+        <div class="table-actions">
+          <div class="page-size">
+            <label for="page-size">每页显示</label>
+            <select id="page-size">
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+              <option value="500">500</option>
+            </select>
+            <span class="page-size-unit">条</span>
+          </div>
+          <div class="column-popover-wrapper">
+            <button id="column-settings-toggle" class="table-gear" type="button" aria-label="列显示设置">⚙️</button>
+            <div id="column-popover" class="column-popover hidden" role="menu">
+              <h4>显示列</h4>
+              <div class="column-list">
+                <label class="column-toggle">
+                  <input type="checkbox" data-column-toggle="FileName" checked />
+                  <span>文件名</span>
+                </label>
+                <label class="column-toggle">
+                  <input type="checkbox" data-column-toggle="Path" checked />
+                  <span>路径</span>
+                </label>
+                <label class="column-toggle">
+                  <input type="checkbox" data-column-toggle="Size" checked />
+                  <span>大小</span>
+                </label>
+                <label class="column-toggle">
+                  <input type="checkbox" data-column-toggle="Date Modified" checked />
+                  <span>修改时间</span>
+                </label>
+                <label class="column-toggle">
+                  <input type="checkbox" data-column-toggle="Date Created" checked />
+                  <span>创建时间</span>
+                </label>
+                <label class="column-toggle">
+                  <input type="checkbox" data-column-toggle="Attributes" checked />
+                  <span>属性</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="loader" class="loader hidden">
+        <span class="spinner"></span>
+        <span>载入中，请稍候...</span>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>
+        数据源：<span id="footer-source">—</span> &nbsp;|&nbsp; 双击行可复制路径到剪贴板。<br />Powered by <a
+          href="https://github.com/raytions/efu-browser" target="_blank">EFU File Browser</a>
+      </p>
+    </footer>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+
+</html>

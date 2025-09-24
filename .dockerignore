@@ -1,0 +1,29 @@
+# Ignore git metadata
+.git
+.gitignore
+
+# Ignore efu files and directory (they will be mounted at runtime)
+*.efu
+efu/
+
+# Node / Python / misc artifacts
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+__pycache__
+*.pyc
+
+# Local environment
+.env
+.DS_Store
+.idea
+.vscode
+
+# Build and docs cache
+coverage
+.tmp
+.cache
+
+# Screenshots source files (keep exported PNGs/JPGs if needed)
+docs/screenshots/source
