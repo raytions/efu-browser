@@ -29,7 +29,7 @@ const ATTRIBUTE_FLAGS = [
   { mask: 0x0400, label: "重解析点" },
   { mask: 0x0800, label: "压缩" },
   { mask: 0x1000, label: "脱机" },
-    { mask: 0x4000, label: "加密" },
+  { mask: 0x4000, label: "加密" },
   { mask: 0x8000, label: "完整性流" },
   { mask: 0x10000, label: "虚拟" },
   { mask: 0x20000, label: "免擦除" },
@@ -92,6 +92,7 @@ const state = {
   caseSensitive: false,
   theme: resolveInitialTheme(),
   progressive: true,
+  localUploads: Object.create(null),
   visibleColumns: {
     FileName: true,
     Path: true,
@@ -138,6 +139,9 @@ const refs = {
   columnSettingsToggle: document.getElementById("column-settings-toggle"),
   columnPopover: document.getElementById("column-popover"),
   themeOptions: Array.from(document.querySelectorAll("[data-theme-option]")),
+  uploadProgress: document.getElementById("upload-progress"),
+  uploadProgressBar: document.getElementById("upload-progress-bar"),
+  uploadProgressText: document.getElementById("upload-progress-text"),
 };
 
 async function init() {
@@ -505,13 +509,45 @@ function render() {
   refs.results.textContent = "";
 
   if (!pageItems.length) {
-    refs.results.innerHTML = "<tr><td colspan=6>未找到匹配的结果。</td></tr>";
+    if (refs.tableWrapper) {
+      refs.tableWrapper.classList.add("empty");
+    }
+    const hasAnyEntries = state.entries.length > 0;
+    const emptyTitle = hasAnyEntries ? '未找到匹配的结果' : '尚未加载数据';
+    const emptyHint = hasAnyEntries
+      ? '试试调整搜索关键字或重置筛选条件。'
+      : '通过加载 Everything 导出的 <code>.efu</code> 文件，或打开本地文件以开始浏览。';
+    refs.results.innerHTML = `
+      <tr class="empty-row">
+        <td colspan="6">
+          <div class="empty-state">
+            <span class="empty-icon">📂</span>
+            <h3>${emptyTitle}</h3>
+            <p>${emptyHint}</p>
+          </div>
+        </td>
+      </tr>
+    `;
+
+    // 管理空状态CSS类
+    if (!hasAnyEntries) {
+      document.body.classList.add('empty-data-state');
+    } else {
+      document.body.classList.remove('empty-data-state');
+    }
+
     updateMetrics();
     updatePaginationControls(totalPages);
     renderSearchFeedback();
     applyColumnVisibility();
     return;
   }
+
+  if (refs.tableWrapper) {
+    refs.tableWrapper.classList.remove("empty");
+  }
+  // 有数据时移除空状态类
+  document.body.classList.remove('empty-data-state');
 
   const chunkSize = Math.min(state.progressive ? 200 : pageItems.length, pageItems.length);
   const processChunk = (start) => {
@@ -526,16 +562,19 @@ function render() {
       const nameTd = document.createElement("td");
       nameTd.className = `name-cell ${COLUMN_CLASSES.FileName}`;
       nameTd.textContent = entry.fileName || "(无文件名)";
+      nameTd.dataset.label = "文件名";
 
       const pathTd = document.createElement("td");
       pathTd.className = `path-cell ${COLUMN_CLASSES.Path}`;
       pathTd.textContent = entry.path;
+      pathTd.dataset.label = "路径";
 
       const sizeTd = document.createElement("td");
       sizeTd.className = `${COLUMN_CLASSES.Size} num-cell`;
       const formattedSize = formatSize(entry);
       sizeTd.textContent = entry.isDirectory ? "—" : formattedSize;
       sizeTd.title = entry.isDirectory ? "" : formattedSize;
+      sizeTd.dataset.label = "大小";
 
       const modifiedTd = document.createElement("td");
       modifiedTd.className = `date-cell ${COLUMN_CLASSES["Date Modified"]}`;
@@ -549,6 +588,7 @@ function render() {
       if (!state.visibleColumns["Date Modified"]) {
         modifiedTd.classList.add("hidden-column");
       }
+      modifiedTd.dataset.label = "修改时间";
 
       const createdTd = document.createElement("td");
       createdTd.className = `date-cell ${COLUMN_CLASSES["Date Created"]}`;
@@ -562,11 +602,13 @@ function render() {
       if (!state.visibleColumns["Date Created"]) {
         createdTd.classList.add("hidden-column");
       }
+      createdTd.dataset.label = "创建时间";
 
       const attrTd = document.createElement("td");
       attrTd.className = `attr-cell ${COLUMN_CLASSES.Attributes}`;
       attrTd.textContent = describeAttributes(entry.attributes);
       attrTd.title = entry.attributes || "";
+      attrTd.dataset.label = "属性";
 
       tr.append(nameTd, pathTd, sizeTd, modifiedTd, createdTd, attrTd);
       tr.addEventListener("dblclick", () => copyPath(entry.path));
@@ -860,7 +902,24 @@ function showLoader(visible) {
 }
 
 function renderError(message) {
-  refs.results.innerHTML = `<tr><td colspan="6">${escapeHtml(message)}</td></tr>`;
+  if (refs.tableWrapper) {
+    refs.tableWrapper.classList.add("empty");
+  }
+  if (message.includes("未能自动加载数据")) {
+    refs.results.innerHTML = `
+      <tr class="empty-row">
+        <td colspan="6">
+          <div class="empty-state">
+            <span class="empty-icon">📁</span>
+            <h3>尚未加载数据</h3>
+            <p>使用上方的 “＋” 按钮或 📂 “本地打开” 来选择 Everything 导出的 <code>.efu</code> 文件。</p>
+          </div>
+        </td>
+      </tr>
+    `;
+  } else {
+    refs.results.innerHTML = `<tr><td colspan="6">${escapeHtml(message)}</td></tr>`;
+  }
   updateMetrics();
   updatePaginationControls(0);
   renderSearchFeedback();
@@ -934,6 +993,33 @@ function cycleTheme() {
   applyTheme();
 }
 
+function showUploadProgress(label) {
+  if (!refs.uploadProgress) return;
+  refs.uploadProgress.classList.remove("hidden");
+  if (refs.uploadProgress.setAttribute) {
+    refs.uploadProgress.setAttribute("aria-label", `正在加载 ${label}`);
+  }
+  updateUploadProgress(0);
+}
+
+function updateUploadProgress(value) {
+  if (!refs.uploadProgressBar || !refs.uploadProgressText) return;
+  const percentage = Math.max(0, Math.min(100, Math.round(value)));
+  refs.uploadProgressBar.style.width = `${percentage}%`;
+  refs.uploadProgressText.textContent = `${percentage}%`;
+}
+
+function hideUploadProgress() {
+  if (!refs.uploadProgress) return;
+  refs.uploadProgress.classList.add("hidden");
+  if (refs.uploadProgressBar) {
+    refs.uploadProgressBar.style.width = "0%";
+  }
+  if (refs.uploadProgressText) {
+    refs.uploadProgressText.textContent = "0%";
+  }
+}
+
 function openPanel(panel) {
   if (!panel) return;
   closePanels();
@@ -951,6 +1037,7 @@ function closePanels() {
     if (panel) panel.classList.add("hidden");
   });
   closeColumnPopover();
+  hideUploadProgress();
 }
 
 function openColumnPopover() {
@@ -973,6 +1060,53 @@ function toggleColumnPopover() {
   } else {
     openColumnPopover();
   }
+}
+
+function readLocalFile(file, { rememberSource = false } = {}) {
+  if (!file) return;
+  const label = file.name || "本地文件";
+  const lower = label.toLowerCase();
+  if (!lower.endsWith(".efu")) {
+    renderError("只允许加载 .efu 文件");
+    return;
+  }
+  if (rememberSource && state.localUploads[label] && !window.confirm(`文件 \"${label}\" 已加载，是否覆盖？`)) {
+    return;
+  }
+
+  showUploadProgress(label);
+
+  const reader = new FileReader();
+  reader.onloadstart = () => updateUploadProgress(0);
+  reader.onprogress = (event) => {
+    if (event.lengthComputable) {
+      updateUploadProgress((event.loaded / event.total) * 100);
+    }
+  };
+  reader.onerror = () => {
+    hideUploadProgress();
+    renderError("读取本地文件失败");
+  };
+  reader.onload = () => {
+    hideUploadProgress();
+    try {
+      ingestContent(reader.result, {
+        type: rememberSource ? "upload" : "local",
+        label,
+        path: label,
+      });
+      if (rememberSource && refs.uploadName) {
+        refs.uploadName.textContent = label;
+      }
+      if (rememberSource) {
+        state.localUploads[label] = true;
+        closePanels();
+      }
+    } catch (error) {
+      renderError("上传的文件解析失败");
+    }
+  };
+  reader.readAsText(file);
 }
 
 function applyColumnVisibility() {
@@ -1022,6 +1156,9 @@ function bindEvents() {
     refs.uploadTrigger.addEventListener("click", () => {
       refs.fileUpload?.click();
     });
+  }
+  if (refs.fileUpload) {
+    refs.fileUpload.addEventListener("change", handleFileUpload);
   }
   if (refs.openSource) {
     refs.openSource.addEventListener("click", () => {
@@ -1091,6 +1228,14 @@ function bindEvents() {
       closeColumnPopover();
     }
   });
+
+  // 空状态点击事件代理
+  document.addEventListener("click", (event) => {
+    const emptyState = event.target.closest('.empty-state');
+    if (emptyState && refs.results.contains(emptyState)) {
+      document.getElementById('upload-trigger').click();
+    }
+  });
   if (refs.pageSize) {
     refs.pageSize.addEventListener("change", (event) => {
       const value = Number(event.target.value);
@@ -1149,31 +1294,100 @@ function bindEvents() {
 }
 function handleFileUpload(event) {
   const [file] = event.target.files || [];
+  event.target.value = "";
   if (!file) return;
+
   refs.fileSelector.value = "";
-  refs.loadSelected.disabled = true;
-  refs.uploadName.textContent = file.name;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      ingestContent(reader.result, {
-        type: "upload",
-        label: file.name,
-      });
-      if (refs.uploadName) {
-        refs.uploadName.textContent = file.name;
-      }
-      closePanels();
-    } catch (error) {
-      resetData();
-      renderError("上传的文件解析失败");
-    }
-  };
-  reader.onerror = () => {
-    resetData();
-    renderError("读取本地文件失败");
-  };
-  reader.readAsText(file);
+  if (refs.loadSelected) {
+    refs.loadSelected.disabled = true;
+  }
+
+  // 检查文件类型
+  if (!file.name.toLowerCase().endsWith('.efu')) {
+    renderError("只允许打开 .efu 文件");
+    return;
+  }
+
+  // 使用前端文件处理
+  readLocalFile(file, { rememberSource: true });
 }
 
 init();
+
+// 浮动滚动条控制
+function initFloatingScrollbar() {
+  // 移除之前的事件监听器，避免重复绑定
+  const existingScrollbar = document.querySelector('.table-scroll');
+  if (existingScrollbar) {
+    existingScrollbar.removeEventListener('scroll', handleScrollEvent);
+    existingScrollbar.removeEventListener('mouseenter', handleMouseEnter);
+    existingScrollbar.removeEventListener('mouseleave', handleMouseLeave);
+  }
+
+  const tableScroll = document.querySelector('.table-scroll');
+  if (!tableScroll) return;
+
+  let scrollTimer;
+
+  // 滚动事件处理函数
+  function handleScrollEvent() {
+    tableScroll.classList.add('scrolling');
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      tableScroll.classList.remove('scrolling');
+    }, 800);
+  }
+
+  // 鼠标进入事件处理函数
+  function handleMouseEnter() {
+    tableScroll.classList.add('scrolling');
+    clearTimeout(scrollTimer);
+  }
+
+  // 鼠标离开事件处理函数
+  function handleMouseLeave() {
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => {
+      tableScroll.classList.remove('scrolling');
+    }, 300);
+  }
+
+  // 添加事件监听器
+  tableScroll.addEventListener('scroll', handleScrollEvent);
+  tableScroll.addEventListener('mouseenter', handleMouseEnter);
+  tableScroll.addEventListener('mouseleave', handleMouseLeave);
+
+  // 将事件处理函数绑定到元素上，便于后续移除
+  tableScroll.handleScrollEvent = handleScrollEvent;
+  tableScroll.handleMouseEnter = handleMouseEnter;
+  tableScroll.handleMouseLeave = handleMouseLeave;
+}
+
+// 在DOM内容变化后重新初始化滚动条
+function reinitScrollbar() {
+  // 延迟执行，确保DOM已更新
+  setTimeout(initFloatingScrollbar, 100);
+}
+
+// 初始化浮动滚动条
+document.addEventListener('DOMContentLoaded', initFloatingScrollbar);
+
+// 监听表格内容更新，重新初始化滚动条
+const tableWrapper = document.querySelector('#table-wrapper');
+if (tableWrapper) {
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'childList' && mutation.target.closest('.table-scroll')) {
+        reinitScrollbar();
+      }
+    });
+  });
+
+  observer.observe(tableWrapper, {
+    childList: true,
+    subtree: true
+  });
+}
+
+// 初始化
+initFloatingScrollbar();
