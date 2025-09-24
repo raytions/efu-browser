@@ -1,11 +1,16 @@
 version: "2.2"
 services:
   efu-browser:
-    build: .
-    image: efu-browser:latest
+    image: ghcr.io/raytions/efu-browser:sha-831588b
     ports:
-      - "8080:80"
+      - "8088:80"
     volumes:
       # 将本地 efu 文件夹映射到容器内的目录
       - ./efu:/app/efu
     restart: unless-stopped
+    network_mode: bridge
+    environment:
+      - TZ=Asia/Shanghai
+      - PUID=1000
+      - PGID=1000
+      - UMASK=022
