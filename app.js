@@ -149,7 +149,22 @@ async function init() {
   bindEvents();
   initialiseControls();
   applyTheme();
+
+  // 确保 DOM完全加载后再应用列可见性
+  await new Promise(resolve => {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', resolve);
+    } else {
+      resolve();
+    }
+  });
+
   applyColumnVisibility();
+
+  // 在下一个事件循环中再次确保应用列宽
+  setTimeout(() => {
+    applyColumnVisibility();
+  }, 0);
 
   // 尝试从缓存加载数据
   const loadedFromCache = loadCachedData();
@@ -1216,6 +1231,77 @@ function applyColumnVisibility() {
       node.classList.toggle("hidden-column", !visible);
     });
   });
+
+  // 动态调整表格列宽类
+  const table = document.querySelector("table");
+  if (table) {
+    // 清除所有动态列宽类
+    table.classList.remove(
+      "table-columns-all",
+      "table-columns-no-created",
+      "table-columns-no-attributes",
+      "table-columns-no-size",
+      "table-columns-no-created-attributes",
+      "table-columns-core",
+      "table-columns-minimal"
+    );
+
+    // 获取当前显示的列
+    const visibleColumns = Object.entries(state.visibleColumns)
+      .filter(([key, visible]) => visible)
+      .map(([key]) => key);
+
+    // 根据显示的列组合设置相应的CSS类
+    const hasFile = visibleColumns.includes("FileName");
+    const hasPath = visibleColumns.includes("Path");
+    const hasSize = visibleColumns.includes("Size");
+    const hasModified = visibleColumns.includes("Date Modified");
+    const hasCreated = visibleColumns.includes("Date Created");
+    const hasAttributes = visibleColumns.includes("Attributes");
+
+    // 计算显示的列数和组合
+    const columnCount = visibleColumns.length;
+
+    if (columnCount === 6) {
+      // 所有列都显示
+      table.classList.add("table-columns-all");
+    } else if (columnCount === 5) {
+      // 5列显示的不同组合
+      if (!hasCreated) {
+        table.classList.add("table-columns-no-created");
+      } else if (!hasAttributes) {
+        table.classList.add("table-columns-no-attributes");
+      } else if (!hasSize) {
+        table.classList.add("table-columns-no-size");
+      } else {
+        table.classList.add("table-columns-all"); // 默认布局
+      }
+    } else if (columnCount === 4) {
+      // 4列显示
+      if (!hasCreated && !hasAttributes) {
+        table.classList.add("table-columns-no-created-attributes");
+      } else {
+        table.classList.add("table-columns-all"); // 默认布局
+      }
+    } else if (columnCount === 3) {
+      // 3列显示 - 核心列 (文件名、路径、修改时间)
+      if (hasFile && hasPath && hasModified) {
+        table.classList.add("table-columns-core");
+      } else {
+        table.classList.add("table-columns-all"); // 默认布局
+      }
+    } else if (columnCount === 2) {
+      // 2列显示 - 最简列 (文件名、路径)
+      if (hasFile && hasPath) {
+        table.classList.add("table-columns-minimal");
+      } else {
+        table.classList.add("table-columns-all"); // 默认布局
+      }
+    } else {
+      // 其他情况使用默认布局
+      table.classList.add("table-columns-all");
+    }
+  }
 }
 
 const debouncedSearch = debounce((event) => {
