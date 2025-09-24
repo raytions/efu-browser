@@ -7,7 +7,6 @@
 :root {
   color-scheme: light dark;
   font-family: "SF Pro", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: radial-gradient(circle at top left, #e4edff 0%, #f3f7ff 45%, #fbfdff 100%);
   --card-color: rgba(255, 255, 255, 0.92);
   --card-border: rgba(186, 204, 240, 0.45);
   --text-primary: #101626;
@@ -26,7 +25,6 @@
 
 :root.theme-dark {
   color-scheme: dark;
-  background: radial-gradient(circle at top left, #0b1324, #0a162c 55%, #091122 100%);
   --card-color: rgba(18, 26, 46, 0.92);
   --card-border: rgba(104, 140, 220, 0.32);
   --text-primary: #f2f6ff;
@@ -45,7 +43,6 @@
 
 :root.theme-mac {
   color-scheme: light;
-  background: linear-gradient(135deg, rgba(244, 248, 255, 0.95) 0%, rgba(230, 238, 255, 0.85) 40%, rgba(221, 233, 255, 0.82) 100%);
   --card-color: rgba(255, 255, 255, 0.6);
   --card-border: rgba(135, 155, 255, 0.3);
   --text-primary: rgba(18, 30, 52, 0.95);
@@ -72,6 +69,19 @@ html,
 body {
   margin: 0;
   min-height: 100vh;
+  width: 100%;
+}
+
+html {
+  background: radial-gradient(circle at top left, #e4edff 0%, #f3f7ff 45%, #fbfdff 100%);
+}
+
+html.theme-dark {
+  background: radial-gradient(circle at top left, #0b1324, #0a162c 55%, #091122 100%);
+}
+
+html.theme-mac {
+  background: linear-gradient(135deg, rgba(244, 248, 255, 0.95) 0%, rgba(230, 238, 255, 0.85) 40%, rgba(221, 233, 255, 0.82) 100%);
 }
 
 body {
@@ -80,6 +90,8 @@ body {
   display: flex;
   justify-content: center;
   padding: clamp(16px, 4vw, 60px);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 a {
@@ -96,6 +108,38 @@ a:hover {
   display: grid;
   gap: clamp(18px, 3vw, 32px);
   padding: 0 clamp(12px, 3vw, 24px);
+  box-sizing: border-box;
+  margin: 0 auto;
+  display: grid;
+  grid-template-areas:
+    "header"
+    "toolbar"
+    "main"
+    "footer";
+  /* Assuming you have other sections */
+  grid-template-rows: auto auto 1fr auto;
+  /* Define row heights */
+  height: 100%;
+  /* Ensure app-shell takes full height if needed */
+}
+
+header.hero {
+  grid-area: header;
+  /* Add other styles as needed */
+}
+
+section.toolbar {
+  grid-area: toolbar;
+  /* Add other styles as needed */
+}
+
+/* Assign other children to grid areas as well */
+section#table-wrapper {
+  grid-area: main;
+}
+
+footer.footer {
+  grid-area: footer;
 }
 
 .hero {
@@ -985,7 +1029,11 @@ td.col-attributes {
 
 @media (max-width: 900px) {
   body {
-    padding: clamp(12px, 5vw, 28px);
+    padding: clamp(12px, 4vw, 28px);
+  }
+
+  .app-shell {
+    padding: 0 clamp(8px, 2.5vw, 16px);
   }
 
   .hero {
@@ -1033,8 +1081,13 @@ td.col-attributes {
 }
 
 @media (max-width: 720px) {
+  body {
+    padding: clamp(10px, 3.5vw, 20px);
+  }
+
   .app-shell {
     gap: clamp(12px, 3vw, 18px);
+    padding: 0 clamp(6px, 2vw, 12px);
   }
 
   .toolbar {
@@ -1064,12 +1117,12 @@ td.col-attributes {
 @media (max-width: 540px) {
   body {
     padding: clamp(8px, 3vw, 16px);
-    /* 减小padding，为小屏幕留出更多空间 */
+    /* 进一步减小外边距，确保内容居中对齐 */
   }
 
   .app-shell {
-    padding: 0 clamp(8px, 2vw, 12px);
-    /* 减小左右内边距，确保居中 */
+    padding: 0 clamp(4px, 1.5vw, 8px);
+    /* 减小左右内边距，确保与body保持协调 */
   }
 
   .hero {
@@ -1100,16 +1153,81 @@ td.col-attributes {
   }
 }
 
-/* iPhone 13等390px宽度设备专门优化 */
-@media (max-width: 400px) {
+/* iPhone SE 等375px宽度设备专门优化 */
+@media (max-width: 375px) {
   body {
     padding: clamp(6px, 2.5vw, 12px);
-    /* 进一步减小外边距 */
+    /* 针对iPhone SE等超小屏幕进一步优化外边距 */
+  }
+
+  .app-shell {
+    padding: 0 clamp(4px, 1vw, 8px);
+    /* 最小的内边距，确保与body边距协调 */
+    gap: clamp(10px, 2.5vw, 16px);
+  }
+
+  .hero {
+    padding: clamp(12px, 3.5vw, 18px);
+    border-radius: 12px;
+  }
+
+  .toolbar {
+    padding: clamp(8px, 2.5vw, 12px);
+    gap: clamp(6px, 1.5vw, 10px);
+    border-radius: 12px;
+  }
+
+  .toolbar-button,
+  .toolbar-icon,
+  .table-gear {
+    border-radius: 10px;
+    min-height: 36px;
+    min-width: 36px;
+    font-size: 14px;
+  }
+
+  .search input {
+    font-size: 14px;
+  }
+
+  .search-box {
+    min-height: 36px;
+  }
+
+  .table-scroll table {
+    min-width: 340px;
+    /* 针对375px屏幕优化表格宽度 */
+  }
+
+  .table-wrapper {
+    border-radius: 12px;
+  }
+
+  .table-footer {
+    padding: 10px;
+  }
+
+  .column-popover {
+    width: 150px;
+  }
+
+  .hero-text h1 {
+    font-size: clamp(24px, 6vw, 32px);
+  }
+
+  .metric-value {
+    font-size: clamp(18px, 4vw, 24px);
+  }
+}
+
+/* iPhone 13等390px宽度设备专门优化 */
+@media (max-width: 400px) and (min-width: 376px) {
+  body {
+    padding: clamp(6px, 2.5vw, 12px);
   }
 
   .app-shell {
     padding: 0 clamp(6px, 1.5vw, 10px);
-    /* 更小的内边距，确保内容居中 */
   }
 
   .hero {
@@ -1119,7 +1237,6 @@ td.col-attributes {
   .toolbar {
     padding: clamp(8px, 3vw, 12px);
     gap: clamp(6px, 2vw, 10px);
-    /* 减小间距节省空间 */
   }
 
   .toolbar-button,
@@ -1127,32 +1244,26 @@ td.col-attributes {
   .table-gear {
     border-radius: 10px;
     min-height: 36px;
-    /* 稍微减小按钮高度 */
   }
 
   .search input {
     font-size: 14px;
-    /* 优化搜索框字体大小 */
   }
 
   .table-scroll table {
     min-width: 350px;
-    /* 减小表格最小宽度，适应390px屏幕 */
   }
 
   .table-wrapper {
     border-radius: 14px;
-    /* 稍微减小圆角 */
   }
 
   .table-footer {
     padding: 12px;
-    /* 减小footer内边距 */
   }
 
   .column-popover {
     width: 160px;
-    /* 减小列设置弹窗宽度 */
   }
 }
 
