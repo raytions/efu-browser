@@ -1296,7 +1296,7 @@ tbody tr:active {
 .footer {
   text-align: center;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 15px;
   padding: 10px 16px;
   margin: 6px auto 0;
   background: var(--footer-bg);
