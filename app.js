@@ -149,7 +149,7 @@ async function init() {
   bindEvents();
   initialiseControls();
   applyTheme();
-  
+
   // 确保 DOM完全加载后再应用列可见性
   await new Promise(resolve => {
     if (document.readyState === 'loading') {
@@ -158,9 +158,9 @@ async function init() {
       resolve();
     }
   });
-  
+
   applyColumnVisibility();
-  
+
   // 在下一个事件循环中再次确保应用列宽
   setTimeout(() => {
     applyColumnVisibility();
