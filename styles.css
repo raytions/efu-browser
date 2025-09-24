@@ -1,4 +1,6 @@
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -18,6 +20,8 @@
   --table-header-bg: rgba(248, 250, 255, 0.98);
   --footer-bg: rgba(255, 255, 255, 0.95);
   --loader-backdrop: rgba(245, 247, 255, 0.92);
+  --scrollbar: rgba(63, 124, 244, 0.4);
+  --scrollbar-track: rgba(63, 124, 244, 0.12);
 }
 
 :root.theme-dark {
@@ -35,6 +39,8 @@
   --table-header-bg: rgba(26, 34, 56, 0.95);
   --footer-bg: rgba(21, 29, 50, 0.95);
   --loader-backdrop: rgba(12, 16, 32, 0.84);
+  --scrollbar: rgba(226, 234, 255, 0.55);
+  --scrollbar-track: rgba(226, 234, 255, 0.2);
 }
 
 :root.theme-mac {
@@ -54,12 +60,7 @@
   --loader-backdrop: rgba(235, 240, 255, 0.6);
 }
 
-:root.theme-mac .hero,
-:root.theme-mac .toolbar,
-:root.theme-mac .panel,
-:root.theme-mac .table-wrapper,
-:root.theme-mac .metric,
-:root.theme-mac .footer {
+:root.theme-mac :is(.hero, .toolbar, .panel, .table-wrapper, .metric, .footer) {
   backdrop-filter: saturate(1.8) blur(28px);
 }
 
@@ -67,25 +68,34 @@
   display: none !important;
 }
 
+html,
 body {
   margin: 0;
   min-height: 100vh;
+}
+
+body {
   color: var(--text-primary);
   background: inherit;
   display: flex;
   justify-content: center;
-  padding: clamp(12px, 4vw, 60px);
-  /* 减小小屏幕下的内边距 */
+  padding: clamp(16px, 4vw, 60px);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 .app-shell {
-  width: min(1220px, 100%);
+  width: min(1200px, 100%);
   display: grid;
-  gap: 24px;
-  padding: 0 clamp(8px, 2vw, 20px);
-  /* 响应式内边距 */
-  margin: 0 auto;
-  box-sizing: border-box;
+  gap: clamp(18px, 3vw, 32px);
+  padding: 0 clamp(12px, 3vw, 24px);
 }
 
 .hero {
@@ -93,7 +103,7 @@ body {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: clamp(18px, 4vw, 32px);
+  gap: clamp(16px, 4vw, 32px);
   padding: clamp(20px, 4vw, 44px);
   background: var(--card-color);
   border: 1px solid var(--card-border);
@@ -101,18 +111,17 @@ body {
   box-shadow: var(--shadow);
 }
 
-.hero h1 {
-  margin: 0 0 6px;
+.hero-text h1 {
+  margin: 0;
   font-size: clamp(28px, 4vw, 40px);
   font-weight: 700;
 }
 
-.hero p {
-  margin: 0;
+.hero-text p {
+  margin: 6px 0 0;
   color: var(--text-secondary);
   font-size: 15px;
   line-height: 1.5;
-  max-width: 40ch;
 }
 
 .active-source {
@@ -153,7 +162,6 @@ body {
 .metric-value {
   font-size: 22px;
   font-weight: 600;
-  color: var(--text-primary);
 }
 
 .toolbar {
@@ -165,21 +173,17 @@ body {
   border-radius: clamp(16px, 3vw, 22px);
   border: 1px solid var(--card-border);
   box-shadow: var(--shadow);
+  position: relative;
 }
 
-/* 搜索框占据剩余空间 */
 .search {
-  order: 2;
-  /* 搜索框位于中间 */
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  /* 允许收缩 */
 }
 
-/* 统一的工具栏按钮基础样式 */
 .toolbar-button,
 .toolbar-icon,
 .table-gear {
@@ -190,97 +194,22 @@ body {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background-color 160ms ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-sizing: border-box;
-  user-select: none;
-  -webkit-user-select: none;
-  flex-shrink: 0;
-  /* 防止按钮被压缩 */
-}
-
-/* 开关按钮的顺序 */
-.toolbar-button {
-  order: 1;
-}
-
-/* 设置按钮的顺序 */
-.toolbar-icon,
-.table-gear {
-  order: 3;
-}
-
-/* 文本按钮样式 */
-.toolbar-button {
-  padding: 10px 18px;
   min-height: 46px;
+  padding: 0 18px;
+  box-sizing: border-box;
 }
 
-/* 图标按钮样式 */
 .toolbar-icon,
 .table-gear {
   width: 46px;
-  height: 46px;
   padding: 0;
   font-size: 20px;
 }
 
-.upload-progress {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px;
-  background: rgba(63, 124, 244, 0.08);
-  border-radius: 14px;
-  border: 1px solid rgba(63, 124, 244, 0.25);
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.progress-track {
-  flex: 1;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(63, 124, 244, 0.15);
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  width: 0%;
-  border-radius: inherit;
-  background: var(--accent);
-  transition: width 120ms ease;
-}
-
-.upload-progress span {
-  min-width: 40px;
-  text-align: right;
-}
-
-
-
-/* 统一的按钮hover效果 */
-.toolbar-button:hover,
-.toolbar-icon:hover,
-.table-gear:hover {
-  border-color: rgba(63, 124, 244, 0.5);
-  box-shadow: 0 12px 26px -18px rgba(63, 124, 244, 0.58);
-  transform: translateY(-1px);
-}
-
-/* 统一的按钮active效果 */
-.toolbar-button:active,
-.toolbar-icon:active,
-.table-gear:active {
-  transform: translateY(0px);
-  transition: transform 80ms ease;
-}
-
-/* 关闭按钮绿色样式 */
 #close-current {
   background: rgba(52, 199, 89, 0.08);
   border-color: rgba(52, 199, 89, 0.25);
@@ -291,7 +220,27 @@ body {
   background: rgba(52, 199, 89, 0.12);
   border-color: rgba(52, 199, 89, 0.4);
   box-shadow: 0 12px 26px -18px rgba(52, 199, 89, 0.45);
+}
+
+.toolbar-button:hover,
+.toolbar-icon:hover,
+.table-gear:hover,
+.select-group button:hover,
+.upload-group button:hover,
+.theme-option:hover,
+.select-group select:hover {
+  border-color: rgba(63, 124, 244, 0.5);
+  box-shadow: 0 12px 26px -18px rgba(63, 124, 244, 0.58);
   transform: translateY(-1px);
+}
+
+.toolbar-button:active,
+.toolbar-icon:active,
+.table-gear:active,
+.select-group button:active,
+.upload-group button:active,
+.theme-option:active {
+  transform: translateY(0);
 }
 
 .search-box {
@@ -324,6 +273,7 @@ body {
   background: transparent;
   font-size: 16px;
   color: var(--text-primary);
+  min-width: 0;
 }
 
 #search-input::placeholder {
@@ -331,7 +281,7 @@ body {
 }
 
 :root.theme-dark #search-input::placeholder {
-  color: rgba(226, 234, 255, 0.6);
+  color: rgba(226, 234, 255, 0.65);
 }
 
 #clear-search {
@@ -360,10 +310,38 @@ body {
   border-radius: 12px;
 }
 
+.upload-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background: rgba(63, 124, 244, 0.08);
+  border-radius: 14px;
+  border: 1px solid rgba(63, 124, 244, 0.25);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(63, 124, 244, 0.15);
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 160ms ease;
+}
+
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(8, 12, 28, 0.22);
+  background: rgba(8, 12, 28, 0.25);
   backdrop-filter: blur(6px);
   z-index: 40;
 }
@@ -426,10 +404,10 @@ body {
 .panel-label {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
 }
 
-.select-group {
+.select-group,
+.upload-group {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -447,31 +425,16 @@ body {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background-color 160ms ease;
 }
 
 .select-group select {
-  min-width: 260px;
+  min-width: 240px;
   appearance: none;
   background-image: url('data:image/svg+xml,%3Csvg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"%3E%3Cpath d="M1 1L5 5L9 1" stroke="%233F7CF4" stroke-width="1.4" stroke-linecap="round"/%3E%3C/svg%3E');
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 36px;
-}
-
-.select-group button:hover,
-.upload-group button:hover,
-.theme-option:hover,
-.select-group select:hover {
-  border-color: rgba(63, 124, 244, 0.5);
-  box-shadow: 0 12px 26px -18px rgba(63, 124, 244, 0.55);
-  transform: translateY(-1px);
-}
-
-.upload-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .upload-name {
@@ -488,7 +451,6 @@ body {
   margin: 0;
   font-size: 15px;
   font-weight: 700;
-  color: var(--text-primary);
 }
 
 .theme-options {
@@ -533,288 +495,59 @@ body {
 }
 
 .table-wrapper {
-  position: relative;
-  overflow: hidden;
   background: var(--card-color);
-  border-radius: 24px;
+  border-radius: clamp(16px, 3vw, 24px);
   border: 1px solid var(--card-border);
   box-shadow: var(--shadow);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: auto;
-  min-height: 400px;
-  width: 100%;
-  max-width: 100%;
+  position: relative;
+  min-height: clamp(320px, 45vh, 540px);
 }
 
 .table-wrapper.empty .table-scroll {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: clamp(160px, 35vh, 240px);
-}
-
-.empty-state {
-  display: grid;
-  place-items: center;
-  gap: 12px;
-  text-align: center;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 24px;
-  border: 2px dashed var(--border-color);
-  border-radius: 16px;
-  background: var(--input-bg);
-  transition: all 200ms ease;
-  margin: 20px;
-}
-
-.empty-state:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px -8px rgba(63, 124, 244, 0.25);
-}
-
-.empty-state h3 {
-  margin: 0;
-  font-size: 18px;
-  color: var(--text-primary);
-}
-
-.empty-state p {
-  margin: 0;
-  font-size: 14px;
-  max-width: 36ch;
-}
-
-.empty-state .empty-icon {
-  font-size: 36px;
+  min-height: clamp(200px, 40vh, 320px);
 }
 
 .table-scroll {
+  overflow: auto;
+  max-height: clamp(320px, 55vh, 680px);
+  border-bottom: 1px solid rgba(28, 36, 52, 0.08);
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  max-height: 50vh;
-  min-height: clamp(180px, 40vh, 280px);
-  border-radius: 18px 18px 0 0;
-}
-
-/* 桌面端 table 居中对齐 */
-@media (min-width: 769px) {
-  .table-scroll {
-    display: flex;
-    justify-content: center;
-  }
-
-  .table-scroll table {
-    width: 100%;
-    max-width: none;
-  }
-}
-
-/* 覆盖式浮动滚动条样式 */
-.table-scroll {
-  /* 始终隐藏原生滚动条，不占据空间 */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  /* IE */
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 .table-scroll::-webkit-scrollbar {
-  width: 6px;
-  background: transparent;
+  width: 10px;
+  height: 10px;
 }
 
 .table-scroll::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 0;
+  background: var(--scrollbar-track);
+  border-radius: 999px;
 }
 
 .table-scroll::-webkit-scrollbar-thumb {
-  background: rgba(63, 124, 244, 0.25);
-  border-radius: 6px;
-  opacity: 0;
-  transition: opacity 0.3s ease, background-color 0.2s ease;
-  min-height: 20px;
+  background: var(--scrollbar);
+  border-radius: 999px;
 }
 
-.table-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(63, 124, 244, 0.5);
-}
-
-/* 滚动时或悬停时显示滚动条 */
 .table-scroll:hover::-webkit-scrollbar-thumb,
 .table-scroll.scrolling::-webkit-scrollbar-thumb {
-  opacity: 1;
+  background: var(--accent);
 }
 
-/* 深色主题下的滚动条 */
-:root.theme-dark .table-scroll::-webkit-scrollbar-thumb {
-  background: rgba(226, 234, 255, 0.2);
-}
-
-:root.theme-dark .table-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(226, 234, 255, 0.35);
-}
-
-/* Firefox: 始终隐藏原生滚动条，不在滚动时显示 */
-.table-scroll:hover,
-.table-scroll.scrolling {
-  scrollbar-width: none;
-  /* 始终隐藏，不要显示 */
-}
-
-:root.theme-dark .table-scroll:hover,
-:root.theme-dark .table-scroll.scrolling {
-  scrollbar-width: none;
-  /* 始终隐藏，不要显示 */
-}
-
-/* Firefox 自定义滚动条指示器（使用伪元素） */
-@-moz-document url-prefix() {
-  .table-scroll {
-    position: relative;
-  }
-
-  .table-scroll::after {
-    content: '';
-    position: absolute;
-    top: 8px;
-    right: 2px;
-    bottom: 8px;
-    width: 4px;
-    background: rgba(63, 124, 244, 0.25);
-    border-radius: 4px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-    z-index: 10;
-  }
-
-  .table-scroll:hover::after,
-  .table-scroll.scrolling::after {
-    opacity: 1;
-  }
-
-  :root.theme-dark .table-scroll::after {
-    background: rgba(226, 234, 255, 0.2);
-  }
-
-  :root.theme-dark .table-scroll:hover::after {
-    background: rgba(226, 234, 255, 0.35);
-  }
-}
-
-/* 确保表格内容完整显示 */
 .table-scroll table {
   width: 100%;
-  table-layout: fixed;
-  margin-right: 0;
-}
-
-table {
-  width: 100%;
   border-collapse: collapse;
-  font-size: 15px;
   table-layout: fixed;
-  /* 使用固定布局以确保列宽一致性 */
-  margin: 0 auto;
-  min-width: 800px;
-  /* 设置最小宽度以保证列的可读性 */
-}
-
-/* 空表格内容的样式 */
-tbody tr td[colspan="6"] {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-/* 空状态容器样式 */
-.empty-state-cell {
-  padding: 40px 20px !important;
-}
-
-.empty-state-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 32px 24px;
-  border: 2px dashed var(--border-color);
-  border-radius: 16px;
-  background: var(--input-bg);
-  cursor: pointer;
-  transition: all 200ms ease;
-  max-width: 320px;
-  margin: 0 auto;
-}
-
-.empty-state-container:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px -8px rgba(63, 124, 244, 0.25);
-}
-
-.empty-state-icon {
-  font-size: 32px;
-  opacity: 0.7;
-}
-
-.empty-state-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.empty-state-hint {
-  font-size: 13px;
-  color: var(--text-secondary);
-  opacity: 0.8;
-}
-
-/* 文件名和路径 - 一样宽 */
-th.col-file,
-td.col-file {
-  width: 30%;
-  min-width: 200px;
-}
-
-th.col-path,
-td.col-path {
-  width: 30%;
-  min-width: 200px;
-}
-
-/* 大小和属性 - 一样宽 */
-th.col-size,
-td.col-size {
-  width: 10%;
-  min-width: 80px;
-  text-align: right;
-}
-
-th.col-attributes,
-td.col-attributes {
-  width: 10%;
-  min-width: 80px;
-}
-
-/* 修改时间和创建时间 - 一样宽 */
-th.col-modified,
-td.col-modified {
-  width: 20%;
-  min-width: 140px;
-}
-
-th.col-created,
-td.col-created {
-  width: 20%;
-  min-width: 140px;
+  min-width: 760px;
+  font-size: 15px;
 }
 
 th,
@@ -824,49 +557,7 @@ td {
   vertical-align: top;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* 特殊列的对齐方式 */
-th.col-size,
-td.col-size {
-  text-align: center;
-  /* 大小列居中对齐 */
-}
-
-th.col-attributes,
-td.col-attributes {
-  text-align: center;
-  /* 属性列居中对齐 */
-}
-
-th.col-modified,
-td.col-modified,
-th.col-created,
-td.col-created {
-  text-align: center;
-  /* 时间列居中对齐 */
-}
-
-/* 文件名和路径保持左对齐 */
-td.col-file,
-td.col-path {
-  text-align: left;
-}
-
-th {
-  text-align: center;
-  background: var(--table-header-bg);
-  font-weight: 600;
-  padding: 14px 12px;
-  /* 调整内边距以获得更好的平衡 */
-  white-space: nowrap;
-  /* 防止表头文字换行 */
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-td {
-  text-align: left;
+  word-break: break-word;
 }
 
 :root.theme-dark th,
@@ -878,20 +569,41 @@ th {
   position: sticky;
   top: 0;
   z-index: 2;
+  text-align: center;
   background: var(--table-header-bg);
   font-size: 13px;
   font-weight: 700;
-  letter-spacing: 1px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   user-select: none;
-  border-bottom: 1px solid rgba(28, 36, 52, 0.15);
-  box-shadow: inset 0 -1px 0 rgba(28, 36, 52, 0.08);
+  white-space: nowrap;
 }
 
-:root.theme-dark th {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+td {
+  text-align: left;
+  color: var(--text-primary);
+  font-size: 15px;
+  white-space: normal;
+}
+
+td.col-size,
+th.col-size,
+th.col-attributes,
+td.col-attributes,
+th.col-modified,
+td.col-modified,
+th.col-created,
+td.col-created {
+  text-align: center;
+}
+
+.table-scroll tbody tr {
+  transition: background-color 160ms ease;
+}
+
+.table-scroll tbody tr:hover {
+  background: rgba(63, 124, 244, 0.08);
 }
 
 th[data-sort]::after {
@@ -908,7 +620,7 @@ th[data-sort]::after {
 }
 
 th[data-sort][data-direction="asc"]::after {
-  transform: translateY(2px) rotate(0deg);
+  transform: translateY(2px);
   border-top-color: rgba(63, 124, 244, 1);
   opacity: 1;
 }
@@ -919,185 +631,95 @@ th[data-sort][data-direction="desc"]::after {
   opacity: 1;
 }
 
-tbody tr {
-  transition: background-color 160ms ease;
-}
-
-tbody tr:hover {
-  background-color: rgba(63, 124, 244, 0.08);
-}
-
-tbody tr:active {
-  background-color: rgba(63, 124, 244, 0.15);
-}
-
-/* 确保列隐藏功能在所有媒体查询中都能正常工作 */
-th.hidden-column,
-td.hidden-column,
 .hidden-column {
   display: none !important;
 }
 
-/* 在所有媒体查询中强制应用列隐藏样式 */
-@media (max-width: 960px) {
-
-  th.hidden-column,
-  td.hidden-column,
-  .hidden-column {
-    display: none !important;
-  }
+tbody tr.empty td {
+  text-align: center;
 }
 
-@media (max-width: 720px) {
-
-  th.hidden-column,
-  td.hidden-column,
-  .hidden-column {
-    display: none !important;
-  }
+.empty-row td {
+  text-align: center;
+  padding: 40px 20px;
 }
 
-@media (max-width: 480px) {
-
-  th.hidden-column,
-  td.hidden-column,
-  .hidden-column {
-    display: none !important;
-  }
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 24px;
+  border: 2px dashed var(--border-color);
+  border-radius: 16px;
+  background: var(--input-bg);
+  cursor: pointer;
+  transition: all 200ms ease;
+  max-width: 320px;
+  margin: 0 auto;
 }
 
-@media (max-width: 390px) {
-
-  th.hidden-column,
-  td.hidden-column,
-  .hidden-column {
-    display: none !important;
-  }
+.empty-state:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -8px rgba(63, 124, 244, 0.25);
 }
 
-@media (max-width: 360px) {
-
-  th.hidden-column,
-  td.hidden-column,
-  .hidden-column {
-    display: none !important;
-  }
-}
-
-.name-cell {
+.empty-state h3 {
+  margin: 0;
+  font-size: 16px;
   font-weight: 600;
-  white-space: normal;
-  word-break: break-word;
-  line-height: 1.5;
 }
 
-.path-cell {
-  font-family: "SF Mono", "Fira Code", Consolas, monospace;
-  white-space: normal;
-  word-break: break-all;
-  line-height: 1.5;
-}
-
-.date-cell {
-  display: table-cell;
-  line-height: 1.4;
-}
-
-.date-cell span {
-  display: block;
-  white-space: nowrap;
-}
-
-.attr-cell {
+.empty-state p {
+  margin: 0;
   font-size: 13px;
   color: var(--text-secondary);
 }
 
-.size-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 12px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-weight: 600;
-  font-size: 13px;
+.empty-state .empty-icon {
+  font-size: 32px;
+  opacity: 0.7;
 }
 
 .table-footer {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   gap: 18px;
-  padding: 14px 20px;
+  padding: 18px 24px;
   background: var(--footer-bg);
-  border-top: 1px solid rgba(28, 36, 52, 0.08);
-  flex-shrink: 0;
 }
 
-.pagination {
+.table-footer .pagination,
+.table-footer .table-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
-  flex-shrink: 0;
 }
 
 .pagination button {
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid var(--border-color);
   background: var(--input-bg);
   color: var(--text-primary);
   padding: 8px 16px;
   font-size: 14px;
-  font-weight: 600;
   cursor: pointer;
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
-.pagination button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.pagination button:not(:disabled):hover {
+.pagination button:hover {
   border-color: rgba(63, 124, 244, 0.5);
-  box-shadow: 0 12px 24px -20px rgba(63, 124, 244, 0.58);
+  box-shadow: 0 10px 22px -16px rgba(63, 124, 244, 0.5);
   transform: translateY(-1px);
 }
 
 .page-info {
   font-size: 14px;
   color: var(--text-secondary);
-}
-
-.table-actions {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  flex-shrink: 0;
-}
-
-.page-size {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  color: var(--text-secondary);
-}
-
-.page-size select {
-  border-radius: 14px;
-  border: 1px solid var(--border-color);
-  background: var(--input-bg);
-  padding: 8px 10px 8px 14px;
-  font-size: 14px;
-  color: var(--text-primary);
-}
-
-.page-size-unit {
-  font-size: 13px;
 }
 
 .page-jump {
@@ -1118,8 +740,21 @@ td.hidden-column,
   font-size: 14px;
 }
 
-:root.theme-dark .page-jump input {
-  border-color: rgba(158, 195, 255, 0.25);
+.page-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.page-size select {
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
+  background: var(--input-bg);
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--text-primary);
 }
 
 .column-popover-wrapper {
@@ -1146,31 +781,10 @@ td.hidden-column,
   z-index: 60;
 }
 
-/* 小屏幕下的列弹出框优化 */
-@media (max-width: 480px) {
-  .column-popover {
-    width: 200px;
-    padding: 14px;
-    z-index: 100;
-    /* 提高z-index确保在小屏上也能正常显示 */
-  }
-}
-
-@media (max-width: 390px) {
-  .column-popover {
-    width: 180px;
-    padding: 12px;
-    z-index: 100;
-    right: -10px;
-    /* 微调位置防止超出屏幕 */
-  }
-}
-
 .column-popover h4 {
   margin: 0;
   font-size: 14px;
   font-weight: 700;
-  color: var(--text-primary);
 }
 
 .column-list {
@@ -1188,7 +802,6 @@ td.hidden-column,
   border: 1px solid var(--border-color);
   font-size: 13px;
   color: var(--text-secondary);
-  cursor: pointer;
 }
 
 .column-toggle input {
@@ -1200,201 +813,6 @@ td.hidden-column,
   margin: 6px 0 0;
   font-size: 13px;
   color: var(--text-secondary);
-}
-
-
-/* 更小屏幕下继续隐藏列 */
-@media (max-width: 640px) {
-
-  /* 移除强制隐藏规则，让动态列宽系统控制列的显示/隐藏
-  .col-attributes,
-  th.col-attributes,
-  td.col-attributes,
-  .col-created,
-  th.col-created,
-  td.col-created {
-    display: none;
-  }
-  */
-
-  /* 调整剩余列的宽度 - 为完整6列场景优化 */
-  .table-columns-all th.col-file,
-  .table-columns-all td.col-file {
-    width: 28%;
-    min-width: 120px;
-  }
-
-  .table-columns-all th.col-path,
-  .table-columns-all td.col-path {
-    width: 28%;
-    min-width: 120px;
-  }
-
-  .table-columns-all th.col-size,
-  .table-columns-all td.col-size {
-    width: 14%;
-    min-width: 60px;
-  }
-
-  .table-columns-all th.col-modified,
-  .table-columns-all td.col-modified {
-    width: 15%;
-    min-width: 90px;
-  }
-
-  .table-columns-all th.col-created,
-  .table-columns-all td.col-created {
-    width: 15%;
-    min-width: 90px;
-  }
-
-  .table-columns-all th.col-attributes,
-  .table-columns-all td.col-attributes {
-    width: 10%;
-    min-width: 50px;
-  }
-
-  /* 当只显示4列时的优化 */
-  .table-columns-no-created-attributes th.col-file,
-  .table-columns-no-created-attributes td.col-file {
-    width: 35%;
-    min-width: 140px;
-  }
-
-  .table-columns-no-created-attributes th.col-path,
-  .table-columns-no-created-attributes td.col-path {
-    width: 35%;
-    min-width: 140px;
-  }
-
-  .table-columns-no-created-attributes th.col-size,
-  .table-columns-no-created-attributes td.col-size {
-    width: 15%;
-    min-width: 80px;
-  }
-
-  .table-columns-no-created-attributes th.col-modified,
-  .table-columns-no-created-attributes td.col-modified {
-    width: 25%;
-    min-width: 120px;
-  }
-
-  table {
-    min-width: 400px;
-  }
-}
-
-/* 最小屏幕下只保留最重要的列 */
-@media (max-width: 480px) {
-
-  /* 移除强制隐藏规则，让动态列宽系统控制
-  .col-attributes,
-  th.col-attributes,
-  td.col-attributes,
-  .col-created,
-  th.col-created,
-  td.col-created,
-  .col-size,
-  th.col-size,
-  td.col-size {
-    display: none;
-  }
-  */
-
-  /* 为动态列宽系统优化不同场景下的宽度分配 */
-
-  /* 移除固定列宽，让动态列宽系统完全控制
-  th.col-file,
-  td.col-file {
-    width: 40%;
-    min-width: 120px;
-  }
-
-  th.col-path,
-  td.col-path {
-    width: 40%;
-    min-width: 120px;
-  }
-
-  th.col-modified,
-  td.col-modified {
-    width: 20%;
-    min-width: 100px;
-  }
-  */
-
-  table {
-    min-width: 340px;
-  }
-
-  th,
-  td {
-    padding: clamp(6px, 1.5vw, 10px);
-    font-size: clamp(12px, 2.8vw, 14px);
-  }
-}
-
-/* 超小屏幕下只保留最核心的两列 */
-@media (max-width: 360px) {
-
-  /* 移除强制隐藏规则，让动态列宽系统控制
-  .col-attributes,
-  th.col-attributes,
-  td.col-attributes,
-  .col-created,
-  th.col-created,
-  td.col-created,
-  .col-size,
-  th.col-size,
-  td.col-size,
-  .col-modified,
-  th.col-modified,
-  td.col-modified {
-    display: none;
-  }
-  */
-
-  /* 为超小屏幕优化动态列宽 - 最小2列场景 */
-  .table-columns-minimal th.col-file,
-  .table-columns-minimal td.col-file {
-    width: 50%;
-    min-width: 100px;
-  }
-
-  .table-columns-minimal th.col-path,
-  .table-columns-minimal td.col-path {
-    width: 50%;
-    min-width: 100px;
-  }
-
-  /* 3列场景（核心列） */
-  .table-columns-core th.col-file,
-  .table-columns-core td.col-file {
-    width: 40%;
-    min-width: 80px;
-  }
-
-  .table-columns-core th.col-path,
-  .table-columns-core td.col-path {
-    width: 35%;
-    min-width: 70px;
-  }
-
-  .table-columns-core th.col-modified,
-  .table-columns-core td.col-modified {
-    width: 25%;
-    min-width: 60px;
-  }
-
-  table {
-    min-width: 200px;
-  }
-
-  th,
-  td {
-    padding: clamp(4px, 1vw, 8px);
-    font-size: clamp(11px, 2.5vw, 13px);
-  }
 }
 
 .loader {
@@ -1430,20 +848,16 @@ td.hidden-column,
   text-align: center;
   color: var(--text-secondary);
   font-size: 15px;
-  padding: 10px 16px;
-  margin: 6px auto 0;
+  padding: 12px 18px;
   background: var(--footer-bg);
   border: 1px solid var(--card-border);
   border-radius: 18px;
   box-shadow: var(--shadow);
   line-height: 1.4;
-  width: 100%;
-  max-width: 100%;
 }
 
 .footer p {
   margin: 0;
-  padding: 0;
 }
 
 code {
@@ -1456,1564 +870,241 @@ code {
   background: rgba(255, 255, 255, 0.12);
 }
 
-/* 平板横屏优化 (721px - 960px) */
-@media (max-width: 960px) and (min-width: 721px) {
+body.empty-data-state .table-wrapper {
+  min-height: clamp(220px, 40vh, 360px);
+}
 
-  /* 基础布局调整 */
-  .app-shell {
-    padding: 0 24px;
-    gap: 20px;
-    max-width: 900px;
-    margin: 0 auto;
+body.empty-data-state .footer {
+  opacity: 0.85;
+}
+
+/* 列宽配置 */
+.table-scroll table {
+  --file-col: 30%;
+  --path-col: 30%;
+  --size-col: 12%;
+  --modified-col: 14%;
+  --created-col: 14%;
+  --attributes-col: 10%;
+}
+
+.table-scroll table.table-columns-no-created {
+  --file-col: 32%;
+  --path-col: 32%;
+  --size-col: 14%;
+  --modified-col: 22%;
+  --created-col: 0%;
+}
+
+.table-scroll table.table-columns-no-attributes {
+  --file-col: 32%;
+  --path-col: 32%;
+  --size-col: 14%;
+  --modified-col: 22%;
+  --attributes-col: 0%;
+}
+
+.table-scroll table.table-columns-no-size {
+  --file-col: 34%;
+  --path-col: 34%;
+  --modified-col: 16%;
+  --created-col: 16%;
+  --size-col: 0%;
+}
+
+.table-scroll table.table-columns-no-created-attributes {
+  --file-col: 36%;
+  --path-col: 36%;
+  --size-col: 16%;
+  --modified-col: 12%;
+  --created-col: 0%;
+  --attributes-col: 0%;
+}
+
+.table-scroll table.table-columns-core {
+  --file-col: 44%;
+  --path-col: 36%;
+  --modified-col: 20%;
+  --size-col: 0%;
+  --created-col: 0%;
+  --attributes-col: 0%;
+}
+
+.table-scroll table.table-columns-minimal {
+  --file-col: 50%;
+  --path-col: 50%;
+  --size-col: 0%;
+  --modified-col: 0%;
+  --created-col: 0%;
+  --attributes-col: 0%;
+}
+
+th.col-file,
+td.col-file {
+  width: var(--file-col);
+}
+
+th.col-path,
+td.col-path {
+  width: var(--path-col);
+}
+
+th.col-size,
+td.col-size {
+  width: var(--size-col);
+}
+
+th.col-modified,
+td.col-modified {
+  width: var(--modified-col);
+}
+
+th.col-created,
+td.col-created {
+  width: var(--created-col);
+}
+
+th.col-attributes,
+td.col-attributes {
+  width: var(--attributes-col);
+}
+
+@media (max-width: 1080px) {
+  .hero,
+  .toolbar,
+  .table-wrapper,
+  .footer {
+    border-radius: 18px;
   }
 
-  /* Hero 平板优化 */
+  .table-scroll table {
+    min-width: 640px;
+  }
+}
+
+@media (max-width: 900px) {
+  body {
+    padding: clamp(12px, 5vw, 28px);
+  }
+
   .hero {
-    padding: 20px 28px;
-    gap: 18px;
-    border-radius: 20px;
-  }
-
-  .hero h1 {
-    font-size: clamp(24px, 3.5vw, 32px);
-  }
-
-  .hero p {
-    font-size: clamp(14px, 2vw, 16px);
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
   }
 
   .hero-meta {
-    gap: 16px;
-    max-width: 400px;
+    justify-items: center;
+    max-width: 420px;
   }
 
-  /* Toolbar 平板优化 */
   .toolbar {
     flex-wrap: wrap;
-    gap: 16px;
-    padding: 16px 20px;
-    border-radius: 18px;
     justify-content: center;
   }
 
-  .search {
-    order: 2;
-    /* 搜索框在中间 */
-    width: 100%;
-  }
-
-  /* 平板按钮样式统一 */
-  .toolbar-button {
-    order: 1;
-    /* 开关按钮在最前 */
-    border-radius: 14px;
-    min-height: 46px;
-    flex-shrink: 0;
-    /* 防止按钮被压缩 */
-    padding: 12px 18px;
-    /* 移除了width: 100%和max-width，避免减号按钮变宽 */
-  }
-
+  .toolbar-button,
   .toolbar-icon,
   .table-gear {
-    order: 3;
-    /* 设置按钮在最后 */
-    border-radius: 14px;
-    min-height: 46px;
     flex-shrink: 0;
-    /* 防止按钮被压缩 */
-    width: 46px;
-    height: 46px;
-    font-size: 20px;
   }
 
-  /* Search 平板优化 */
-  .search-box {
-    min-height: 48px;
-    border-radius: 16px;
-    padding: 0 16px;
-  }
-
-  /* Table 平板优化 */
-  .table-scroll {
-    border-radius: 18px 18px 0 0;
-  }
-
-  .table-wrapper {
-    border-radius: 18px;
+  .search {
+    order: 3;
     width: 100%;
-    max-width: 100%;
-  }
-
-  /* 平板端表格列宽调整 */
-  table {
-    min-width: 700px;
-  }
-
-  th.col-file,
-  td.col-file,
-  th.col-path,
-  td.col-path {
-    width: 28%;
-    min-width: 160px;
-  }
-
-  th.col-modified,
-  td.col-modified,
-  th.col-created,
-  td.col-created {
-    width: 22%;
-    min-width: 120px;
   }
 
   .table-footer {
     flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 20px;
+    align-items: stretch;
   }
 
-  .table-actions {
-    order: 1;
-    flex-wrap: wrap;
+  .table-footer .pagination,
+  .table-footer .table-actions {
     justify-content: center;
-    gap: 12px;
   }
 
-  .pagination {
-    order: 2;
-    justify-content: center;
-    gap: 8px;
-  }
-
-  /* Panel 平板优化 */
-  .panel {
-    width: min(85vw, 500px);
-    border-radius: 18px;
-  }
-
-  /* Footer 平板优化 */
-  .footer {
-    padding: 8px 16px;
-    margin: 12px auto 0;
-    font-size: 12px;
-    border-radius: 16px;
+  .column-popover {
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
   }
 }
 
 @media (max-width: 720px) {
-
-  /* 隐藏属性列 */
-  .col-attributes,
-  th.col-attributes,
-  td.col-attributes {
-    display: none;
-  }
-
-  /* 调整剩余列的宽度 */
-  th.col-file,
-  td.col-file {
-    width: 30%;
-    min-width: 140px;
-  }
-
-  th.col-path,
-  td.col-path {
-    width: 30%;
-    min-width: 140px;
-  }
-
-  th.col-size,
-  td.col-size {
-    width: 15%;
-    min-width: 80px;
-  }
-
-  th.col-modified,
-  td.col-modified,
-  th.col-created,
-  td.col-created {
-    width: 20%;
-    min-width: 110px;
-  }
-
-  table {
-    min-width: 470px;
-  }
-
-  /* 基础布局优化 */
   .app-shell {
-    padding: 0 16px;
-    gap: 16px;
-    max-width: 100%;
-    margin: 0 auto;
-  }
-
-  /* Hero 移动端优化 */
-  .hero {
-    flex-direction: column;
-    text-align: center;
-    padding: clamp(16px, 4vw, 24px) clamp(16px, 5vw, 28px);
-    gap: clamp(12px, 3vw, 20px);
-    border-radius: clamp(16px, 3.5vw, 24px);
-    align-items: center;
-  }
-
-  .hero h1 {
-    font-size: clamp(20px, 5.5vw, 32px);
-    margin: 0 0 clamp(4px, 1vw, 8px);
-  }
-
-  .hero p {
-    font-size: clamp(13px, 3.5vw, 16px);
-    margin: 0 0 clamp(8px, 2vw, 12px);
-    max-width: 90%;
-  }
-
-  .hero-meta {
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
     gap: clamp(12px, 3vw, 18px);
-    width: 100%;
-    justify-items: center;
-    max-width: 320px;
   }
 
-  .metric {
-    min-width: 100px;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .metric-value {
-    font-size: clamp(16px, 4vw, 22px);
-  }
-
-  .metric-label {
-    font-size: clamp(11px, 3vw, 14px);
-  }
-
-  /* Toolbar 移动端优化 - 水平布局 */
   .toolbar {
-    flex-wrap: nowrap;
-    /* 不换行，保持在同一水平线 */
-    gap: clamp(8px, 2vw, 16px);
-    padding: clamp(12px, 3vw, 18px) clamp(16px, 4vw, 20px);
-    border-radius: clamp(16px, 3.5vw, 20px);
+    gap: clamp(8px, 2.4vw, 14px);
+    padding: clamp(12px, 3vw, 18px);
   }
 
-  .search {
-    order: 2;
-    /* 搜索框在中间 */
-    flex: 1;
-    /* 搜索框占据剩余空间 */
-    min-width: 0;
-    /* 允许收缩 */
-  }
-
-  /* \u7edf\u4e00\u79fb\u52a8\u7aef\u6309\u94ae\u6837\u5f0f */
   .toolbar-button,
   .toolbar-icon,
   .table-gear {
-    border-radius: clamp(12px, 3vw, 16px);
-    font-size: clamp(13px, 3.5vw, 15px);
-    min-height: clamp(40px, 10vw, 44px);
-    flex-shrink: 0;
-    /* 防止按钮被压缩 */
-  }
-
-  /* \u79fb\u52a8\u7aef\u6587\u672c\u6309\u94ae */
-  .toolbar-button {
-    padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 20px);
-    order: 1;
-    /* 开关按钮在最前 */
-  }
-
-  /* \u79fb\u52a8\u7aef\u56fe\u6807\u6309\u94ae */
-  .toolbar-icon,
-  .table-gear {
-    width: clamp(40px, 10vw, 44px);
-    height: clamp(40px, 10vw, 44px);
-    font-size: clamp(18px, 5vw, 20px);
-    order: 3;
-    /* 设置按钮在最后 */
-  }
-
-  /* Search 移动端优化 */
-  .search {
-    gap: clamp(4px, 1vw, 8px);
+    min-height: 42px;
   }
 
   .search-box {
-    padding: 0 clamp(10px, 3vw, 16px);
-    min-height: clamp(42px, 10vw, 50px);
-    border-radius: clamp(14px, 3vw, 18px);
-    gap: clamp(8px, 2vw, 12px);
+    min-height: 44px;
   }
 
-  #search-input {
-    font-size: clamp(14px, 3.5vw, 16px);
+  .table-scroll table {
+    min-width: 560px;
   }
 
-  .search-error {
-    font-size: clamp(12px, 3vw, 14px);
-    padding: clamp(6px, 1.5vw, 10px) clamp(10px, 2.5vw, 14px);
-    border-radius: clamp(10px, 2.5vw, 14px);
-  }
-
-  /* Table 移动端优化 */
-  .table-wrapper {
-    border-radius: clamp(16px, 3.5vw, 20px);
-    min-height: clamp(240px, 50vw, 320px);
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  .table-footer {
-    padding: clamp(10px, 2.5vw, 16px) clamp(16px, 4vw, 20px);
-    flex-direction: column;
-    align-items: center;
-    gap: clamp(12px, 3vw, 16px);
-    border-radius: 0 0 clamp(16px, 3.5vw, 20px) clamp(16px, 3.5vw, 20px);
-  }
-
-  .pagination {
-    order: 2;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: clamp(6px, 1.5vw, 10px);
-  }
-
-  .table-actions {
-    order: 1;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: clamp(8px, 2vw, 12px);
-  }
-
-  /* Panel 移动端优化 */
-  .panel {
-    width: min(92vw, 400px);
-    border-radius: clamp(16px, 3.5vw, 20px);
-    margin: 0 auto;
-  }
-
-  /* Footer 移动端优化 */
-  .footer {
-    padding: clamp(6px, 1.5vw, 10px) clamp(10px, 2.5vw, 16px);
-    margin: clamp(8px, 2vw, 16px) auto 0;
-    font-size: clamp(10px, 2.5vw, 12px);
-    line-height: 1.3;
-    border-radius: clamp(12px, 3vw, 16px);
-    text-align: center;
-  }
-
-  /* Table-scroll 移动端优化 */
-  .table-scroll {
-    border-radius: clamp(16px, 3.5vw, 20px) clamp(16px, 3.5vw, 20px) 0 0;
-    width: 100%;
-    max-width: 100%;
-    overflow-x: auto;
-    box-sizing: border-box;
-  }
-
-  /* Table cells */
-  th,
-  td {
-    padding: clamp(10px, 2.5vw, 14px);
-  }
-
-  /* 移动端表格完全自适应 */
-  table {
-    width: 100%;
-    max-width: 100%;
-    min-width: 100%;
-    table-layout: auto;
-    box-sizing: border-box;
-  }
-
-  th,
-  td {
-    padding: clamp(8px, 2vw, 12px);
-    font-size: clamp(13px, 3vw, 15px);
-    white-space: normal;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    box-sizing: border-box;
-    max-width: 100%;
-  }
-
-  /* 表头也允许换行 */
-  th {
-    white-space: normal;
-    line-height: 1.2;
-  }
-
-  th.col-file,
-  td.col-file,
-  th.col-path,
-  td.col-path {
-    width: 30%;
-    max-width: 200px;
-    min-width: 80px;
-  }
-
-  th.col-modified,
-  td.col-modified,
-  th.col-created,
-  td.col-created {
-    width: 20%;
-    max-width: 140px;
-    min-width: 70px;
-  }
-
-  th.col-size,
-  td.col-size,
-  th.col-attributes,
-  td.col-attributes {
-    width: 10%;
-    max-width: 80px;
-    min-width: 50px;
-  }
-
-  /* 小屏幕下的空状态优化 */
-  .empty-state-container {
-    padding: clamp(20px, 5vw, 32px) clamp(16px, 4vw, 24px);
-    max-width: clamp(280px, 70vw, 360px);
-    margin: 0 auto;
-    text-align: center;
-  }
-
-  .empty-state-icon {
-    font-size: clamp(24px, 6vw, 36px);
-  }
-
-  .empty-state-text {
-    font-size: clamp(14px, 3.5vw, 18px);
-  }
-
-  .empty-state-hint {
-    font-size: clamp(12px, 3vw, 14px);
+  .column-popover {
+    width: 200px;
   }
 }
 
-/* 竖屏专门优化 - 针对手机竖屏使用场景 */
-@media (max-width: 720px) and (orientation: portrait) {
-
-  /* 竖屏时进一步压缩间距 */
-  .app-shell {
-    gap: clamp(8px, 2vw, 14px);
+@media (max-width: 540px) {
+  body {
+    padding: clamp(10px, 4vw, 18px);
   }
 
   .hero {
-    padding: clamp(12px, 3vw, 20px) clamp(14px, 4vw, 24px);
-    gap: clamp(8px, 2vw, 14px);
-  }
-
-  .hero h1 {
-    font-size: clamp(18px, 5vw, 28px);
-    margin-bottom: clamp(2px, 0.5vw, 6px);
-  }
-
-  .hero p {
-    margin-bottom: clamp(6px, 1.5vw, 10px);
-  }
-
-  .hero-meta {
-    gap: clamp(8px, 2vw, 14px);
-    max-width: 280px;
+    padding: clamp(16px, 5vw, 24px);
   }
 
   .toolbar {
-    padding: clamp(8px, 2vw, 14px) clamp(12px, 3vw, 18px);
-    gap: clamp(6px, 1.5vw, 10px);
-    /* 减小间距以节省空间 */
+    padding: clamp(10px, 4vw, 16px);
   }
 
-  /* 竖屏模式下进一步压缩按钮尺寸 */
   .toolbar-button,
   .toolbar-icon,
   .table-gear {
-    border-radius: clamp(10px, 2.5vw, 14px);
-    min-height: clamp(36px, 9vw, 40px);
-    flex-shrink: 0;
-    /* 防止按钮被过度压缩 */
+    border-radius: 12px;
+    min-height: 38px;
   }
 
-  /* 竖屏模式下搜索框进一步压缩 */
-  .search {
-    order: 2;
-    /* 确保搜索框在中间 */
-    min-width: 120px;
-    /* 设置最小宽度确保可用性 */
-  }
-
-  .toolbar-button {
-    order: 1;
-    /* 确保开关按钮在最前 */
-  }
-
-  .toolbar-icon,
-  .table-gear {
-    order: 3;
-    /* 确保设置按钮在最后 */
-  }
-
-  .toolbar-button {
-    padding: clamp(6px, 1.5vw, 10px) clamp(12px, 3vw, 16px);
-    font-size: clamp(12px, 3vw, 14px);
-  }
-
-  .toolbar-icon,
-  .table-gear {
-    width: clamp(36px, 9vw, 40px);
-    height: clamp(36px, 9vw, 40px);
-    font-size: clamp(16px, 4vw, 18px);
-  }
-
-  .table-scroll {
-    border-radius: clamp(14px, 3vw, 18px) clamp(14px, 3vw, 18px) 0 0;
-    width: 100%;
-    max-width: 100%;
-    overflow-x: auto;
-    box-sizing: border-box;
-  }
-
-  .table-wrapper {
-    min-height: clamp(200px, 40vw, 260px);
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  /* 竖屏模式下严格控制表格宽度 */
-  table {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    /* 允许收缩 */
-    table-layout: fixed;
-    /* 使用固定布局避免宽度计算问题 */
-    box-sizing: border-box;
-  }
-
-  th,
-  td {
-    width: auto;
-    /* 让列宽自动分配 */
-    min-width: 0;
-    /* 允许收缩 */
-    max-width: none;
-    /* 移除最大宽度限制 */
-    padding: clamp(6px, 1.5vw, 10px) clamp(4px, 1vw, 8px);
-    font-size: clamp(11px, 2.5vw, 14px);
-    white-space: normal;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    box-sizing: border-box;
-    hyphens: auto;
-    line-height: 1.2;
-  }
-
-  /* 竖屏下的列宽优化 - 平均分配 */
-  th.col-file,
-  td.col-file,
-  th.col-path,
-  td.col-path {
-    width: 30%;
-  }
-
-  th.col-modified,
-  td.col-modified,
-  th.col-created,
-  td.col-created {
-    width: 20%;
-  }
-
-  th.col-size,
-  td.col-size,
-  th.col-attributes,
-  td.col-attributes {
-    width: 10%;
+  .table-scroll table {
+    min-width: 460px;
   }
 
   .table-footer {
-    padding: clamp(8px, 2vw, 12px) clamp(12px, 3vw, 16px);
-    gap: clamp(8px, 2vw, 12px);
+    padding: 16px;
   }
 
-  .footer {
-    padding: clamp(4px, 1vw, 8px) clamp(8px, 2vw, 12px);
-    margin: clamp(4px, 1vw, 8px) auto 0;
-    font-size: clamp(9px, 2vw, 11px);
-    line-height: 1.2;
-  }
-
-  /* 空数据状态的竖屏优化 */
-  .empty-data-state .toolbar {
-    padding: clamp(6px, 1.5vw, 10px) clamp(10px, 2.5vw, 14px);
-  }
-
-  .empty-data-state .footer {
-    padding: clamp(2px, 0.5vw, 4px) clamp(4px, 1vw, 8px);
-    margin: clamp(1px, 0.25vw, 3px) auto 0;
-    font-size: clamp(8px, 1.8vw, 10px);
-    line-height: 1.1;
-  }
-
-  .empty-data-state .table-footer {
-    padding: clamp(4px, 1vw, 8px) clamp(8px, 2vw, 12px);
-  }
-
-  .empty-state-container {
-    padding: clamp(16px, 4vw, 24px) clamp(12px, 3vw, 18px);
-    max-width: clamp(240px, 60vw, 300px);
+  .column-popover {
+    width: 180px;
   }
 }
 
-/* iPhone XR等中等屏幕优化 (414px) */
-@media (max-width: 430px) and (min-width: 391px) {
-
-  /* 优化居中显示 */
-  .app-shell {
-    padding: 0 clamp(10px, 3vw, 16px);
-    gap: clamp(10px, 2.5vw, 14px);
-    margin: 0 auto;
+@media (max-width: 420px) {
+  .table-scroll table {
+    min-width: 360px;
   }
 
-  /* 针对iPhone XR的表格优化 */
-  .table-wrapper {
-    border-radius: 14px;
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .table-scroll {
-    border-radius: 14px 14px 0 0;
-    overflow-x: auto;
-  }
-
-  table {
-    min-width: 380px;
-    table-layout: fixed;
-  }
-
-  th, td {
-    padding: 8px 6px;
-    font-size: 13px;
-  }
-
-  /* 按钮和搜索框高度统一 */
-  .toolbar-button {
-    min-height: 36px;
-    font-size: 13px;
-  }
-
-  .toolbar-icon,
-  .table-gear {
-    width: 36px;
-    height: 36px;
-  }
-
-  .search-box {
-    min-height: 36px;
-  }
-
-}
-
-/* 超小屏幕优化 */
-@media (max-width: 480px) {
-
-  /* 基础布局微调 */
-  .app-shell {
-    padding: 0 12px;
-    gap: 12px;
-  }
-
-  /* Hero 小屏优化 */
-  .hero {
-    padding: clamp(12px, 3.5vw, 20px) clamp(12px, 4vw, 24px);
-    gap: clamp(10px, 2.5vw, 16px);
-    border-radius: clamp(14px, 3vw, 18px);
-  }
-
-  .hero h1 {
-    font-size: clamp(18px, 5vw, 26px);
-  }
-
-  .hero p {
-    font-size: clamp(12px, 3vw, 15px);
-  }
-
-  .hero-meta {
-    grid-template-columns: repeat(2, 1fr);
-    gap: clamp(10px, 2.5vw, 14px);
-    max-width: 280px;
-  }
-
-  .metric-value {
-    font-size: clamp(14px, 3.5vw, 20px);
-  }
-
-  .metric-label {
-    font-size: clamp(10px, 2.5vw, 12px);
-  }
-
-  /* Toolbar 小屏优化 */
-  .toolbar {
-    padding: clamp(10px, 2.5vw, 16px) clamp(12px, 3vw, 18px);
-    gap: clamp(10px, 2.5vw, 14px);
-    border-radius: clamp(14px, 3vw, 18px);
-  }
-
-  /* 小屏下搜索框顺序 */
-  .search {
-    order: 2;
-    /* 搜索框在中间 */
-  }
-
-  /* 小屏幕按钮样式统一 */
-  .toolbar-button,
-  .toolbar-icon,
-  .table-gear {
-    border-radius: clamp(8px, 2vw, 12px);
-    min-height: clamp(34px, 8.5vw, 38px);
-    flex-shrink: 0;
-    /* 防止按钮被压缩 */
-  }
-
-  /* 同步search-box的高度 */
-  .search-box {
-    min-height: clamp(34px, 8.5vw, 38px);
-  }
-
-  .toolbar-button {
-    order: 1;
-    /* 开关按钮在最前 */
-    padding: clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 14px);
-    font-size: clamp(11px, 2.8vw, 13px);
-  }
-
-  .toolbar-icon,
-  .table-gear {
-    order: 3;
-    /* 设置按钮在最后 */
-    width: clamp(34px, 8.5vw, 38px);
-    height: clamp(34px, 8.5vw, 38px);
-    font-size: clamp(14px, 3.5vw, 16px);
-  }
-
-  /* Table 小屏优化 */
-  .table-wrapper {
-    border-radius: clamp(14px, 3vw, 18px);
-    min-height: clamp(200px, 45vw, 280px);
-    width: 100%;
-    max-width: 100%;
-  }
-
-  /* Table-scroll 小屏优化 - 确保水平滚动 */
-  .table-scroll {
-    border-radius: clamp(14px, 3vw, 18px) clamp(14px, 3vw, 18px) 0 0;
-    overflow-x: auto;
-    width: 100%;
-    max-width: 100%;
-  }
-
-  /* 小屏移动端表格完全自适应 */
-  table {
-    width: 100%;
-    min-width: 320px;
-    /* 设置合理的最小宽度，允许水平滚动 */
-    table-layout: fixed;
-    /* 使用固定布局确保列宽设置生效 */
-  }
-
-  th,
-  td {
-    padding: clamp(6px, 1.8vw, 10px);
-    font-size: clamp(12px, 2.8vw, 14px);
-    white-space: normal;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
-  }
-
-  /* 表头也允许换行 */
-  th {
-    white-space: normal;
-    line-height: 1.1;
-  }
-
-  /* 进一步优化列宽分配 - 现在由动态列宽系统管理
-  th.col-file,
-  td.col-file,
-  th.col-path,
-  td.col-path {
-    width: 32%;
-    max-width: 150px;
-    min-width: 60px;
-  }
-
-  th.col-modified,
-  td.col-modified,
-  th.col-created,
-  td.col-created {
-    width: 18%;
-    max-width: 100px;
-    min-width: 50px;
-  }
-
-  th.col-size,
-  td.col-size,
-  th.col-attributes,
-  td.col-attributes {
-    width: 9%;
-    max-width: 70px;
-    min-width: 40px;
-  }
-  */
-
-  .table-footer {
-    flex-direction: column;
-    align-items: center;
-    gap: clamp(8px, 2vw, 12px);
-    padding: clamp(8px, 2vw, 14px) clamp(12px, 3vw, 18px);
-  }
-
-  .pagination {
-    justify-content: center;
-    order: 2;
-    gap: clamp(4px, 1vw, 8px);
-  }
-
-  .table-actions {
-    justify-content: center;
-    order: 1;
-    gap: clamp(6px, 1.5vw, 10px);
-  }
-
-  /* 手机端表格进一步优化 */
-  .table-wrapper tbody tr {
-    margin: 0 0 clamp(8px, 2vw, 12px);
-    padding: clamp(8px, 2vw, 12px) clamp(10px, 2.5vw, 14px);
-    border-radius: clamp(10px, 2.5vw, 14px);
-  }
-
-  .table-wrapper td {
-    padding: clamp(4px, 1vw, 8px) 0;
-    font-size: clamp(12px, 3vw, 14px);
-  }
-
-  .table-wrapper td::before {
-    font-size: clamp(10px, 2.5vw, 12px);
-    margin-bottom: clamp(2px, 0.5vw, 4px);
-  }
-
-  /* Table-scroll 小屏优化 */
-  .table-scroll {
-    border-radius: clamp(14px, 3vw, 18px) clamp(14px, 3vw, 18px) 0 0;
-  }
-
-  /* Footer 小屏优化 */
-  .footer {
-    padding: clamp(4px, 1vw, 8px) clamp(8px, 2vw, 12px);
-    margin: clamp(4px, 1vw, 8px) auto 0;
-    font-size: clamp(9px, 2vw, 11px);
-    border-radius: clamp(10px, 2.5vw, 14px);
-    line-height: 1.2;
-  }
-
-  /* Panel 小屏优化 */
-  .panel {
-    width: min(95vw, 360px);
-    border-radius: clamp(14px, 3vw, 18px);
+  .page-jump input {
+    width: 64px;
   }
 }
 
-/* iPhone 12等中等移动设备优化 */
-@media (max-width: 390px) {
-
-  /* 基础布局优化 */
-  .app-shell {
-    padding: 0 10px;
-    gap: 10px;
-  }
-
-  /* Hero 中等移动设备优化 */
-  .hero {
-    padding: 12px 16px;
-    gap: 10px;
-    border-radius: 14px;
-  }
-
-  .hero h1 {
-    font-size: clamp(16px, 4.5vw, 20px);
-    margin-bottom: 3px;
-  }
-
-  .hero p {
-    font-size: clamp(11px, 3vw, 13px);
-    margin-bottom: 7px;
-  }
-
-  .hero-meta {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 9px;
-    max-width: 260px;
-  }
-
-  .metric-value {
-    font-size: clamp(13px, 3.2vw, 16px);
-  }
-
-  .metric-label {
-    font-size: clamp(9px, 2.3vw, 11px);
-  }
-
-  /* Toolbar 中等移动设备优化 */
-  .toolbar {
-    padding: 9px 13px;
-    gap: 7px;
-    border-radius: 13px;
-  }
-
-  /* 中等移动设备按钮优化 */
-  .toolbar-button {
-    order: 1;
-    padding: 6px 11px;
-    border-radius: 11px;
-    min-height: 34px;
-    font-size: 12px;
-  }
-
-  .toolbar-icon,
-  .table-gear {
-    order: 3;
-    width: 34px;
-    height: 34px;
-    font-size: 15px;
-    border-radius: 11px;
-  }
-
-  /* 同步search-box的高度 */
-  .search-box {
-    min-height: 34px;
-  }
-
-  .search {
-    order: 2;
-    min-width: 110px;
-  }
-
-  /* Table 中等移动设备优化 */
-  .table-wrapper {
-    border-radius: 15px;
-    min-height: clamp(180px, 35vw, 240px);
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  .table-scroll {
-    border-radius: 15px 15px 0 0;
-    width: 100%;
-    max-width: 100%;
-    overflow-x: auto;
-    box-sizing: border-box;
-  }
-
-  /* 中等移动设备下的表格优化 */
-  table {
-    width: 100%;
-    max-width: 100%;
-    min-width: 340px;
-    /* 确保表格最小宽度 */
-    table-layout: fixed;
-    box-sizing: border-box;
-  }
-
-  th,
-  td {
-    padding: clamp(7px, 1.8vw, 11px) clamp(5px, 1.2vw, 9px);
-    font-size: clamp(11px, 2.8vw, 14px);
-    white-space: normal;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    box-sizing: border-box;
-    hyphens: auto;
-    line-height: 1.3;
-    text-align: left;
-  }
-
-  /* 中等移动设备下的列宽分配 - 现在由动态列宽系统管理
-  th.col-file,
-  td.col-file {
-    width: 40%;
-    min-width: 120px;
-  }
-
-  th.col-path,
-  td.col-path {
-    width: 40%;
-    min-width: 120px;
-  }
-
-  th.col-modified,
-  td.col-modified {
-    width: 20%;
-    min-width: 100px;
-    text-align: center;
-  }
-  */
-
-  .table-footer {
-    padding: clamp(9px, 2.2vw, 13px) clamp(13px, 3.2vw, 17px);
-    gap: clamp(9px, 2.2vw, 13px);
-    border-radius: 0 0 15px 15px;
-  }
-
-  /* Footer 中等移动设备优化 */
-  .footer {
-    padding: 6px 10px;
-    margin: 6px auto 0;
-    font-size: 10px;
-    border-radius: 12px;
-    line-height: 1.3;
-  }
-
-  /* Panel 中等移动设备优化 */
-  .panel {
-    width: min(92vw, 380px);
-    border-radius: 15px;
-  }
-}
-
-/* 超小屏幕进一步优化 */
-@media (max-width: 360px) {
-
-  /* 基础布局紧凑 */
-  .app-shell {
-    padding: 0 8px;
-    gap: 8px;
-  }
-
-  /* Hero 超小屏优化 */
-  .hero {
-    padding: 10px 14px;
-    gap: 8px;
-    border-radius: 12px;
-  }
-
-  .hero h1 {
-    font-size: 18px;
-    margin-bottom: 2px;
-  }
-
-  .hero p {
-    font-size: 12px;
-    margin-bottom: 6px;
-  }
-
-  .hero-meta {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    max-width: 240px;
-  }
-
-  .metric-value {
-    font-size: 14px;
-  }
-
-  .metric-label {
-    font-size: 10px;
-  }
-
-  /* Toolbar 超小屏优化 */
-  .toolbar {
-    padding: 8px 12px;
-    gap: 6px;
-    /* 减小间距以适应超小屏幕 */
-    border-radius: 12px;
-  }
-
-  .search input {
-    font-size: 14px;
-    padding: 8px 12px;
-  }
-
-  /* 超小屏按钮样式统一 */
-  .toolbar-button,
-  .toolbar-icon,
-  .table-gear {
-    border-radius: 10px;
-    min-height: 32px;
-    font-size: 11px;
-    flex-shrink: 0;
-    /* 防止按钮被过度压缩 */
-  }
-
-  /* 同步search-box的高度 */
-  .search-box {
-    min-height: 32px;
-  }
-
-  .toolbar-button {
-    order: 1;
-    /* 开关按钮在最前 */
-    padding: 5px 10px;
-    /* 轻微减小内边距以节省空间 */
-  }
-
-  .toolbar-icon,
-  .table-gear {
-    order: 3;
-    /* 设置按钮在最后 */
-    width: 32px;
-    height: 32px;
-    font-size: 14px;
-  }
-
-  /* 超小屏下搜索框最小宽度 */
-  .search {
-    order: 2;
-    /* 搜索框在中间 */
-    min-width: 100px;
-  }
-
-  /* Table-scroll 超小屏优化 */
-  .table-scroll {
-    border-radius: 12px 12px 0 0;
-  }
-
-  /* Table 超小屏优化 */
-  .table-wrapper {
-    border-radius: 12px;
-    min-height: 180px;
-    width: 100%;
-    max-width: 100%;
-  }
-
-  /* 超小屏表格完全自适应 */
-  table {
-    width: 100%;
-    min-width: 100%;
-    table-layout: auto;
-  }
-
-  th,
-  td {
-    padding: 4px 6px;
-    font-size: 11px;
-    white-space: normal;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
-    line-height: 1.3;
-  }
-
-  /* 表头也允许换行 */
-  th {
-    white-space: normal;
-    line-height: 1.1;
-    font-size: 10px;
-  }
-
-  /* 超紧凑列宽分配 - 现在由动态列宽系统管理
-  th.col-file,
-  td.col-file,
-  th.col-path,
-  td.col-path {
-    width: 35%;
-    max-width: 120px;
-    min-width: 50px;
-  }
-
-  th.col-modified,
-  td.col-modified,
-  th.col-created,
-  td.col-created {
-    width: 15%;
-    max-width: 80px;
-    min-width: 40px;
-  }
-
-  th.col-size,
-  td.col-size,
-  th.col-attributes,
-  td.col-attributes {
-    width: 7.5%;
-    max-width: 60px;
-    min-width: 30px;
-  }
-  */
-
-  .table-footer {
-    padding: 6px 10px;
-    gap: 6px;
-  }
-
-  .table-wrapper tbody tr {
-    margin-bottom: 6px;
-    padding: 6px 10px;
-    border-radius: 10px;
-  }
-
-  .table-wrapper td {
-    padding: 3px 0;
-    font-size: 12px;
-  }
-
-  .table-wrapper td::before {
-    font-size: 10px;
-    margin-bottom: 1px;
-  }
-
-  /* Footer 超小屏优化 */
-  .footer {
-    padding: 3px 6px;
-    margin: 2px auto 0;
-    font-size: 9px;
-    border-radius: 10px;
-    line-height: 1.1;
-  }
-
-  /* Panel 超小屏优化 */
-  .panel {
-    width: min(98vw, 320px);
-    border-radius: 12px;
-  }
-
-  /* Empty state 超小屏优化 */
-  .empty-state-container {
-    padding: 16px 12px;
-    max-width: 240px;
-  }
-
-  .empty-state-icon {
-    font-size: 20px;
-  }
-
-  .empty-state-text {
-    font-size: 13px;
-  }
-
-  .empty-state-hint {
-    font-size: 11px;
-  }
-}
-
-.num-cell {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-/* 动态列宽系统 - 根据显示的列数量自动调整宽度 */
-
-/* 当所有6列都显示时的默认布局 */
-.table-columns-all th.col-file,
-.table-columns-all td.col-file {
-  width: 25%;
-}
-
-.table-columns-all th.col-path,
-.table-columns-all td.col-path {
-  width: 25%;
-}
-
-.table-columns-all th.col-size,
-.table-columns-all td.col-size {
-  width: 12%;
-}
-
-.table-columns-all th.col-modified,
-.table-columns-all td.col-modified {
-  width: 15%;
-}
-
-.table-columns-all th.col-created,
-.table-columns-all td.col-created {
-  width: 15%;
-}
-
-.table-columns-all th.col-attributes,
-.table-columns-all td.col-attributes {
-  width: 8%;
-}
-
-/* 当隐藏创建时间列时 (5列显示) */
-.table-columns-no-created th.col-file,
-.table-columns-no-created td.col-file {
-  width: 30%;
-}
-
-.table-columns-no-created th.col-path,
-.table-columns-no-created td.col-path {
-  width: 30%;
-}
-
-.table-columns-no-created th.col-size,
-.table-columns-no-created td.col-size {
-  width: 15%;
-}
-
-.table-columns-no-created th.col-modified,
-.table-columns-no-created td.col-modified {
-  width: 18%;
-}
-
-.table-columns-no-created th.col-attributes,
-.table-columns-no-created td.col-attributes {
-  width: 7%;
-}
-
-/* 当隐藏属性列时 (5列显示) */
-.table-columns-no-attributes th.col-file,
-.table-columns-no-attributes td.col-file {
-  width: 28%;
-}
-
-.table-columns-no-attributes th.col-path,
-.table-columns-no-attributes td.col-path {
-  width: 28%;
-}
-
-.table-columns-no-attributes th.col-size,
-.table-columns-no-attributes td.col-size {
-  width: 14%;
-}
-
-.table-columns-no-attributes th.col-modified,
-.table-columns-no-attributes td.col-modified {
-  width: 15%;
-}
-
-.table-columns-no-attributes th.col-created,
-.table-columns-no-attributes td.col-created {
-  width: 15%;
-}
-
-/* 当隐藏大小列时 (5列显示) */
-.table-columns-no-size th.col-file,
-.table-columns-no-size td.col-file {
-  width: 30%;
-}
-
-.table-columns-no-size th.col-path,
-.table-columns-no-size td.col-path {
-  width: 30%;
-}
-
-.table-columns-no-size th.col-modified,
-.table-columns-no-size td.col-modified {
-  width: 17%;
-}
-
-.table-columns-no-size th.col-created,
-.table-columns-no-size td.col-created {
-  width: 17%;
-}
-
-.table-columns-no-size th.col-attributes,
-.table-columns-no-size td.col-attributes {
-  width: 6%;
-}
-
-/* 当只隐藏创建时间和属性列时 (4列显示) */
-.table-columns-no-created-attributes th.col-file,
-.table-columns-no-created-attributes td.col-file {
-  width: 35%;
-}
-
-.table-columns-no-created-attributes th.col-path,
-.table-columns-no-created-attributes td.col-path {
-  width: 35%;
-}
-
-.table-columns-no-created-attributes th.col-size,
-.table-columns-no-created-attributes td.col-size {
-  width: 15%;
-}
-
-.table-columns-no-created-attributes th.col-modified,
-.table-columns-no-created-attributes td.col-modified {
-  width: 15%;
-}
-
-/* 当只显示核心3列时 (文件名、路径、修改时间) */
-.table-columns-core th.col-file,
-.table-columns-core td.col-file {
-  width: 40%;
-}
-
-.table-columns-core th.col-path,
-.table-columns-core td.col-path {
-  width: 40%;
-}
-
-.table-columns-core th.col-modified,
-.table-columns-core td.col-modified {
-  width: 20%;
-}
-
-/* 当只显示最简2列时 (文件名、路径) */
-.table-columns-minimal th.col-file,
-.table-columns-minimal td.col-file {
-  width: 50%;
-}
-
-.table-columns-minimal th.col-path,
-.table-columns-minimal td.col-path {
-  width: 50%;
-}
-
-/* 小屏幕下的动态列宽优化 */
-@media (max-width: 480px) {
-
-  .table-columns-all th.col-file,
-  .table-columns-all td.col-file {
-    width: 28%;
-  }
-
-  .table-columns-all th.col-path,
-  .table-columns-all td.col-path {
-    width: 28%;
-  }
-
-  .table-columns-all th.col-size,
-  .table-columns-all td.col-size {
-    width: 12%;
-    min-width: 50px;
-    /* 确保最小宽度，避免内容被挤压 */
-  }
-
-  .table-columns-all th.col-modified,
-  .table-columns-all td.col-modified {
-    width: 16%;
-    min-width: 80px;
-    /* 确保日期能够正常显示 */
-  }
-
-  .table-columns-all th.col-created,
-  .table-columns-all td.col-created {
-    width: 16%;
-    min-width: 80px;
-    /* 确保日期能够正常显示 */
-  }
-
-  .table-columns-all th.col-attributes,
-  .table-columns-all td.col-attributes {
-    width: 12%;
-    min-width: 40px;
-    /* 确保属性列不会完全消失 */
-  }
-
-  .table-columns-no-created th.col-file,
-  .table-columns-no-created td.col-file {
-    width: 35%;
-  }
-
-  .table-columns-no-created th.col-path,
-  .table-columns-no-created td.col-path {
-    width: 35%;
-  }
-
-  .table-columns-no-created th.col-size,
-  .table-columns-no-created td.col-size {
-    width: 15%;
-    min-width: 60px;
-  }
-
-  .table-columns-no-created th.col-modified,
-  .table-columns-no-created td.col-modified {
-    width: 20%;
-    min-width: 90px;
-  }
-
-  .table-columns-no-created th.col-attributes,
-  .table-columns-no-created td.col-attributes {
-    width: 15%;
-    min-width: 50px;
-  }
-
-  .table-columns-core th.col-file,
-  .table-columns-core td.col-file {
-    width: 45%;
-  }
-
-  .table-columns-core th.col-path,
-  .table-columns-core td.col-path {
-    width: 35%;
-  }
-
-  .table-columns-core th.col-modified,
-  .table-columns-core td.col-modified {
-    width: 20%;
-  }
-}
-
-@media (max-width: 390px) {
-
-  .table-columns-all th.col-file,
-  .table-columns-all td.col-file {
-    width: 26%;
-  }
-
-  .table-columns-all th.col-path,
-  .table-columns-all td.col-path {
-    width: 26%;
-  }
-
-  .table-columns-all th.col-modified,
-  .table-columns-all td.col-modified {
-    width: 18%;
-    min-width: 70px;
-  }
-
-  .table-columns-all th.col-size,
-  .table-columns-all td.col-size {
-    width: 12%;
-    min-width: 45px;
-    /* iPhone 12上确保最小可见宽度 */
-  }
-
-  .table-columns-all th.col-created,
-  .table-columns-all td.col-created {
-    width: 12%;
-    min-width: 45px;
-    /* iPhone 12上确保最小可见宽度 */
-  }
-
-  .table-columns-all th.col-attributes,
-  .table-columns-all td.col-attributes {
-    width: 6%;
-    min-width: 30px;
-    /* iPhone 12上确保最小可见宽度 */
-  }
-
-  .table-columns-core th.col-file,
-  .table-columns-core td.col-file {
-    width: 50%;
-  }
-
-  .table-columns-core th.col-path,
-  .table-columns-core td.col-path {
-    width: 30%;
-  }
-
-  .table-columns-core th.col-modified,
-  .table-columns-core td.col-modified {
-    width: 20%;
-  }
-
-  .table-columns-minimal th.col-file,
-  .table-columns-minimal td.col-file {
-    width: 60%;
-  }
-
-  .table-columns-minimal th.col-path,
-  .table-columns-minimal td.col-path {
-    width: 40%;
+@supports not (backdrop-filter: blur(2px)) {
+  :root.theme-mac :is(.hero, .toolbar, .panel, .table-wrapper, .metric, .footer) {
+    background: rgba(255, 255, 255, 0.9);
   }
 }
