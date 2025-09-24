@@ -155,8 +155,7 @@ body {
 }
 
 .toolbar {
-  display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  display: flex;
   align-items: center;
   gap: clamp(12px, 3vw, 28px);
   padding: clamp(12px, 3vw, 24px);
@@ -166,6 +165,19 @@ body {
   box-shadow: var(--shadow);
 }
 
+/* 搜索框占据剩余空间 */
+.search {
+  order: 2;
+  /* 搜索框位于中间 */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  /* 允许收缩 */
+}
+
+/* 统一的工具栏按钮基础样式 */
 .toolbar-button,
 .toolbar-icon,
 .table-gear {
@@ -175,9 +187,42 @@ body {
   color: var(--text-primary);
   font-size: 14px;
   font-weight: 600;
-  padding: 10px 18px;
   cursor: pointer;
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  user-select: none;
+  -webkit-user-select: none;
+  flex-shrink: 0;
+  /* 防止按钮被压缩 */
+}
+
+/* 开关按钮的顺序 */
+.toolbar-button {
+  order: 1;
+}
+
+/* 设置按钮的顺序 */
+.toolbar-icon,
+.table-gear {
+  order: 3;
+}
+
+/* 文本按钮样式 */
+.toolbar-button {
+  padding: 10px 18px;
+  min-height: 44px;
+}
+
+/* 图标按钮样式 */
+.toolbar-icon,
+.table-gear {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 20px;
 }
 
 .upload-progress {
@@ -214,23 +259,23 @@ body {
   text-align: right;
 }
 
-.toolbar-icon,
-.table-gear {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  font-size: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
 
+
+/* 统一的按钮hover效果 */
 .toolbar-button:hover,
 .toolbar-icon:hover,
 .table-gear:hover {
   border-color: rgba(63, 124, 244, 0.5);
   box-shadow: 0 12px 26px -18px rgba(63, 124, 244, 0.58);
   transform: translateY(-1px);
+}
+
+/* 统一的按钮active效果 */
+.toolbar-button:active,
+.toolbar-icon:active,
+.table-gear:active {
+  transform: translateY(0px);
+  transition: transform 80ms ease;
 }
 
 /* 关闭按钮绿色样式 */
@@ -245,12 +290,6 @@ body {
   border-color: rgba(52, 199, 89, 0.4);
   box-shadow: 0 12px 26px -18px rgba(52, 199, 89, 0.45);
   transform: translateY(-1px);
-}
-
-.search {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
 }
 
 .search-box {
@@ -1317,24 +1356,43 @@ code {
 
   /* Toolbar 平板优化 */
   .toolbar {
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
     gap: 16px;
     padding: 16px 20px;
     border-radius: 18px;
+    justify-content: center;
   }
 
   .search {
-    order: 1;
+    order: 2;
+    /* 搜索框在中间 */
+    width: 100%;
   }
 
-  .toolbar-button,
-  .toolbar-icon {
-    order: 2;
+  /* 平板按钮样式统一 */
+  .toolbar-button {
+    order: 1;
+    /* 开关按钮在最前 */
+    border-radius: 14px;
+    min-height: 46px;
+    flex-shrink: 0;
+    /* 防止按钮被压缩 */
     width: 100%;
-    justify-self: center;
     max-width: 200px;
-    padding: 10px 18px;
-    border-radius: 12px;
+    padding: 12px 18px;
+  }
+
+  .toolbar-icon,
+  .table-gear {
+    order: 3;
+    /* 设置按钮在最后 */
+    border-radius: 14px;
+    min-height: 46px;
+    flex-shrink: 0;
+    /* 防止按钮被压缩 */
+    width: 46px;
+    height: 46px;
+    font-size: 20px;
   }
 
   /* Search 平板优化 */
@@ -1504,27 +1562,50 @@ code {
     font-size: clamp(11px, 3vw, 14px);
   }
 
-  /* Toolbar 移动端优化 */
+  /* Toolbar 移动端优化 - 水平布局 */
   .toolbar {
-    grid-template-columns: 1fr;
-    gap: clamp(12px, 3vw, 16px);
+    flex-wrap: nowrap;
+    /* 不换行，保持在同一水平线 */
+    gap: clamp(8px, 2vw, 16px);
     padding: clamp(12px, 3vw, 18px) clamp(16px, 4vw, 20px);
     border-radius: clamp(16px, 3.5vw, 20px);
-    justify-items: center;
   }
 
   .search {
-    order: 1;
-    width: 100%;
-    max-width: 400px;
+    order: 2;
+    /* 搜索框在中间 */
+    flex: 1;
+    /* 搜索框占据剩余空间 */
+    min-width: 0;
+    /* 允许收缩 */
   }
 
+  /* \u7edf\u4e00\u79fb\u52a8\u7aef\u6309\u94ae\u6837\u5f0f */
   .toolbar-button,
-  .toolbar-icon {
-    order: 2;
-    padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 20px);
+  .toolbar-icon,
+  .table-gear {
+    border-radius: clamp(12px, 3vw, 16px);
     font-size: clamp(13px, 3.5vw, 15px);
-    border-radius: clamp(8px, 2vw, 12px);
+    min-height: clamp(40px, 10vw, 44px);
+    flex-shrink: 0;
+    /* 防止按钮被压缩 */
+  }
+
+  /* \u79fb\u52a8\u7aef\u6587\u672c\u6309\u94ae */
+  .toolbar-button {
+    padding: clamp(8px, 2vw, 12px) clamp(16px, 4vw, 20px);
+    order: 1;
+    /* 开关按钮在最前 */
+  }
+
+  /* \u79fb\u52a8\u7aef\u56fe\u6807\u6309\u94ae */
+  .toolbar-icon,
+  .table-gear {
+    width: clamp(40px, 10vw, 44px);
+    height: clamp(40px, 10vw, 44px);
+    font-size: clamp(18px, 5vw, 20px);
+    order: 3;
+    /* 设置按钮在最后 */
   }
 
   /* Search 移动端优化 */
@@ -1715,7 +1796,49 @@ code {
 
   .toolbar {
     padding: clamp(8px, 2vw, 14px) clamp(12px, 3vw, 18px);
-    gap: clamp(8px, 2vw, 12px);
+    gap: clamp(6px, 1.5vw, 10px);
+    /* 减小间距以节省空间 */
+  }
+
+  /* 竖屏模式下进一步压缩按钮尺寸 */
+  .toolbar-button,
+  .toolbar-icon,
+  .table-gear {
+    border-radius: clamp(10px, 2.5vw, 14px);
+    min-height: clamp(36px, 9vw, 40px);
+    flex-shrink: 0;
+    /* 防止按钮被过度压缩 */
+  }
+
+  /* 竖屏模式下搜索框进一步压缩 */
+  .search {
+    order: 2;
+    /* 确保搜索框在中间 */
+    min-width: 120px;
+    /* 设置最小宽度确保可用性 */
+  }
+
+  .toolbar-button {
+    order: 1;
+    /* 确保开关按钮在最前 */
+  }
+
+  .toolbar-icon,
+  .table-gear {
+    order: 3;
+    /* 确保设置按钮在最后 */
+  }
+
+  .toolbar-button {
+    padding: clamp(6px, 1.5vw, 10px) clamp(12px, 3vw, 16px);
+    font-size: clamp(12px, 3vw, 14px);
+  }
+
+  .toolbar-icon,
+  .table-gear {
+    width: clamp(36px, 9vw, 40px);
+    height: clamp(36px, 9vw, 40px);
+    font-size: clamp(16px, 4vw, 18px);
   }
 
   .table-scroll {
@@ -1861,6 +1984,38 @@ code {
     padding: clamp(10px, 2.5vw, 16px) clamp(12px, 3vw, 18px);
     gap: clamp(10px, 2.5vw, 14px);
     border-radius: clamp(14px, 3vw, 18px);
+  }
+
+  /* 小屏下搜索框顺序 */
+  .search {
+    order: 2;
+    /* 搜索框在中间 */
+  }
+
+  /* 小屏幕按钮样式统一 */
+  .toolbar-button,
+  .toolbar-icon,
+  .table-gear {
+    border-radius: clamp(8px, 2vw, 12px);
+    min-height: clamp(34px, 8.5vw, 38px);
+    flex-shrink: 0;
+    /* 防止按钮被压缩 */
+  }
+
+  .toolbar-button {
+    order: 1;
+    /* 开关按钮在最前 */
+    padding: clamp(6px, 1.5vw, 8px) clamp(10px, 2.5vw, 14px);
+    font-size: clamp(11px, 2.8vw, 13px);
+  }
+
+  .toolbar-icon,
+  .table-gear {
+    order: 3;
+    /* 设置按钮在最后 */
+    width: clamp(34px, 8.5vw, 38px);
+    height: clamp(34px, 8.5vw, 38px);
+    font-size: clamp(14px, 3.5vw, 16px);
   }
 
   /* Table 小屏优化 */
@@ -2022,7 +2177,8 @@ code {
   /* Toolbar 超小屏优化 */
   .toolbar {
     padding: 8px 12px;
-    gap: 10px;
+    gap: 6px;
+    /* 减小间距以适应超小屏幕 */
     border-radius: 12px;
   }
 
@@ -2031,10 +2187,38 @@ code {
     padding: 8px 12px;
   }
 
+  /* 超小屏按钮样式统一 */
   .toolbar-button,
-  .toolbar-icon {
-    padding: 6px 12px;
-    font-size: 12px;
+  .toolbar-icon,
+  .table-gear {
+    border-radius: 10px;
+    min-height: 32px;
+    font-size: 11px;
+    flex-shrink: 0;
+    /* 防止按钮被过度压缩 */
+  }
+
+  .toolbar-button {
+    order: 1;
+    /* 开关按钮在最前 */
+    padding: 5px 10px;
+    /* 轻微减小内边距以节省空间 */
+  }
+
+  .toolbar-icon,
+  .table-gear {
+    order: 3;
+    /* 设置按钮在最后 */
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  /* 超小屏下搜索框最小宽度 */
+  .search {
+    order: 2;
+    /* 搜索框在中间 */
+    min-width: 100px;
   }
 
   /* Table-scroll 超小屏优化 */
