@@ -123,6 +123,7 @@ const refs = {
   toggleCaseSensitive: document.getElementById("toggle-case-sensitive"),
   uploadName: document.getElementById("upload-name"),
   openSource: document.getElementById("open-source"),
+  closeCurrent: document.getElementById("close-current"),
   closeSource: document.getElementById("close-source"),
   openSettings: document.getElementById("open-settings"),
   closeSettings: document.getElementById("close-settings"),
@@ -149,8 +150,17 @@ async function init() {
   initialiseControls();
   applyTheme();
   applyColumnVisibility();
+
+  // 尝试从缓存加载数据
+  const loadedFromCache = loadCachedData();
+
   await loadPresetDirectory();
-  await attemptInitialLoad();
+
+  // 只有在缓存没有加载成功时才尝试自动加载
+  if (!loadedFromCache) {
+    await attemptInitialLoad();
+  }
+
   updateSortIndicators();
 }
 
@@ -346,6 +356,7 @@ function ingestContent(text, sourceMeta) {
   applySort();
   render();
   updateSortIndicators();
+  saveCachedData(); // 保存到缓存
   setActiveSource(sourceMeta?.label || "未命名数据源");
 }
 
@@ -935,10 +946,99 @@ async function copyPath(path) {
 }
 
 function setActiveSource(label) {
-  const text = label || "—";
+  const text = label || "尚未加载";
   refs.activeSource.textContent = text;
   if (refs.footerSource) {
     refs.footerSource.textContent = text;
+  }
+
+  // 根据是否加载文件来切换按钮显示
+  const hasFile = label && label !== "等待加载" && label !== "—" && label !== "尚未加载";
+
+  if (refs.openSource) {
+    refs.openSource.style.display = hasFile ? 'none' : 'inline-block';
+  }
+
+  if (refs.closeCurrent) {
+    refs.closeCurrent.style.display = hasFile ? 'inline-block' : 'none';
+  }
+}
+
+// 从本地存储加载缓存数据
+function loadCachedData() {
+  try {
+    const cached = localStorage.getItem('efu-cached-data');
+    if (cached) {
+      const data = JSON.parse(cached);
+      if (data.entries && data.activeSource && data.timestamp) {
+        // 检查缓存是否过期（24小时）
+        const now = Date.now();
+        const cacheAge = now - data.timestamp;
+        const maxAge = 24 * 60 * 60 * 1000; // 24小时
+
+        if (cacheAge < maxAge) {
+          state.entries = data.entries;
+          state.filtered = data.entries.filter(filterDirectories);
+          state.activeSource = data.activeSource;
+          setActiveSource(data.activeSource.name || data.activeSource.path);
+          applySearch(""); // 重新应用搜索和排序
+          console.log('已从缓存恢复数据:', data.activeSource.name);
+          return true;
+        } else {
+          // 缓存过期，清理
+          localStorage.removeItem('efu-cached-data');
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('无法加载缓存数据:', error);
+    localStorage.removeItem('efu-cached-data');
+  }
+  return false;
+}
+
+// 保存数据到本地存储
+function saveCachedData() {
+  if (state.entries.length > 0 && state.activeSource) {
+    try {
+      const data = {
+        entries: state.entries,
+        activeSource: state.activeSource,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('efu-cached-data', JSON.stringify(data));
+      console.log('数据已缓存:', state.activeSource.name || state.activeSource.path);
+    } catch (error) {
+      console.warn('无法缓存数据:', error);
+    }
+  }
+}
+
+// 关闭当前文件
+function closeCurrentFile() {
+  if (state.activeSource) {
+    // 获取当前文件名用于清理记录
+    const currentFileName = state.activeSource.label || state.activeSource.path || state.activeSource.name;
+
+    // 清理当前数据
+    resetData();
+
+    // 清理缓存
+    localStorage.removeItem('efu-cached-data');
+
+    // 清理本地上传记录，避免重新上传时出现覆盖提示
+    if (currentFileName && state.localUploads[currentFileName]) {
+      delete state.localUploads[currentFileName];
+    }
+
+    // 重置状态到初始状态
+    state.activeSource = null;
+    setActiveSource('');
+
+    // 清空表格内容，显示初始空状态
+    render();
+
+    console.log('已关闭文件并清理缓存和上传记录');
   }
 }
 
@@ -1164,6 +1264,9 @@ function bindEvents() {
     refs.openSource.addEventListener("click", () => {
       openPanel(refs.sourcePanel);
     });
+  }
+  if (refs.closeCurrent) {
+    refs.closeCurrent.addEventListener("click", closeCurrentFile);
   }
   if (refs.closeSource) {
     refs.closeSource.addEventListener("click", closePanels);

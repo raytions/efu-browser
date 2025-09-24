@@ -233,6 +233,20 @@ body {
   transform: translateY(-1px);
 }
 
+/* 关闭按钮绿色样式 */
+#close-current {
+  background: rgba(52, 199, 89, 0.08);
+  border-color: rgba(52, 199, 89, 0.25);
+  color: #34c759;
+}
+
+#close-current:hover {
+  background: rgba(52, 199, 89, 0.12);
+  border-color: rgba(52, 199, 89, 0.4);
+  box-shadow: 0 12px 26px -18px rgba(52, 199, 89, 0.45);
+  transform: translateY(-1px);
+}
+
 .search {
   display: flex;
   flex-direction: column;
@@ -1078,68 +1092,136 @@ tbody tr:active {
   color: var(--text-secondary);
 }
 
-@media (max-width: 768px) {
 
-  /* 重置 table-scroll 居中，防止影响移动端卡片布局 */
-  .table-scroll {
-    display: block;
-    justify-content: unset;
-  }
+/* 更小屏幕下继续隐藏列 */
+@media (max-width: 640px) {
 
-  .table-wrapper thead {
+  /* 隐藏属性列和创建时间列 */
+  .col-attributes,
+  th.col-attributes,
+  td.col-attributes,
+  .col-created,
+  th.col-created,
+  td.col-created {
     display: none;
   }
 
-  .table-wrapper table,
-  .table-wrapper tbody,
-  .table-wrapper tr,
-  .table-wrapper td {
-    display: block;
-    width: 100%;
+  /* 调整剩余列的宽度 */
+  th.col-file,
+  td.col-file {
+    width: 35%;
+    min-width: 140px;
   }
 
-  /* 在移动端显示所有列，即使在桌面端被隐藏 */
-  .table-wrapper .hidden-column {
-    display: block !important;
+  th.col-path,
+  td.col-path {
+    width: 35%;
+    min-width: 140px;
   }
 
-  .table-wrapper tbody tr {
-    margin: 0 0 16px;
-    border: 1px solid var(--card-border);
-    border-radius: 18px;
-    background: var(--card-color);
-    box-shadow: 0 16px 32px -28px rgba(16, 24, 48, 0.35);
-    padding: 12px 14px;
-    min-height: 60px;
-    width: 100% !important;
-    display: block !important;
+  th.col-size,
+  td.col-size {
+    width: 15%;
+    min-width: 80px;
   }
 
-  .table-wrapper tbody tr:last-child {
-    margin-bottom: 0;
+  th.col-modified,
+  td.col-modified {
+    width: 25%;
+    min-width: 120px;
   }
 
-  .table-wrapper td {
-    position: relative;
-    padding: 8px 0;
-    border: none;
-    text-align: left;
-    display: block !important;
-    width: 100% !important;
+  table {
+    min-width: 400px;
+  }
+}
+
+/* 最小屏幕下只保留最重要的列 */
+@media (max-width: 480px) {
+
+  /* 隐藏属性列、创建时间列和大小列 */
+  .col-attributes,
+  th.col-attributes,
+  td.col-attributes,
+  .col-created,
+  th.col-created,
+  td.col-created,
+  .col-size,
+  th.col-size,
+  td.col-size {
+    display: none;
   }
 
-  .table-wrapper td::before {
-    content: attr(data-label);
-    display: block;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-secondary);
-    margin-bottom: 4px;
+  /* 调整为显示文件名、路径和修改时间 */
+  th.col-file,
+  td.col-file {
+    width: 40%;
+    min-width: 120px;
   }
 
-  .table-wrapper .num-cell {
-    text-align: left;
+  th.col-path,
+  td.col-path {
+    width: 40%;
+    min-width: 120px;
+  }
+
+  th.col-modified,
+  td.col-modified {
+    width: 20%;
+    min-width: 100px;
+  }
+
+  table {
+    min-width: 340px;
+  }
+
+  th,
+  td {
+    padding: clamp(6px, 1.5vw, 10px);
+    font-size: clamp(12px, 2.8vw, 14px);
+  }
+}
+
+/* 超小屏幕下只保留最核心的两列 */
+@media (max-width: 360px) {
+
+  /* 隐藏除文件名和路径外的所有列 */
+  .col-attributes,
+  th.col-attributes,
+  td.col-attributes,
+  .col-created,
+  th.col-created,
+  td.col-created,
+  .col-size,
+  th.col-size,
+  td.col-size,
+  .col-modified,
+  th.col-modified,
+  td.col-modified {
+    display: none;
+  }
+
+  /* 调整为只显示文件名和路径 */
+  th.col-file,
+  td.col-file {
+    width: 50%;
+    min-width: 100px;
+  }
+
+  th.col-path,
+  td.col-path {
+    width: 50%;
+    min-width: 100px;
+  }
+
+  table {
+    min-width: 200px;
+  }
+
+  th,
+  td {
+    padding: clamp(4px, 1vw, 8px);
+    font-size: clamp(11px, 2.5vw, 13px);
   }
 }
 
@@ -1331,6 +1413,44 @@ code {
 
 @media (max-width: 720px) {
 
+  /* 隐藏属性列 */
+  .col-attributes,
+  th.col-attributes,
+  td.col-attributes {
+    display: none;
+  }
+
+  /* 调整剩余列的宽度 */
+  th.col-file,
+  td.col-file {
+    width: 30%;
+    min-width: 140px;
+  }
+
+  th.col-path,
+  td.col-path {
+    width: 30%;
+    min-width: 140px;
+  }
+
+  th.col-size,
+  td.col-size {
+    width: 15%;
+    min-width: 80px;
+  }
+
+  th.col-modified,
+  td.col-modified,
+  th.col-created,
+  td.col-created {
+    width: 20%;
+    min-width: 110px;
+  }
+
+  table {
+    min-width: 470px;
+  }
+
   /* 基础布局优化 */
   .app-shell {
     padding: 0 16px;
@@ -1435,6 +1555,7 @@ code {
     min-height: clamp(240px, 50vw, 320px);
     width: 100%;
     max-width: 100%;
+    box-sizing: border-box;
   }
 
   .table-footer {
@@ -1479,6 +1600,10 @@ code {
   /* Table-scroll 移动端优化 */
   .table-scroll {
     border-radius: clamp(16px, 3.5vw, 20px) clamp(16px, 3.5vw, 20px) 0 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    box-sizing: border-box;
   }
 
   /* Table cells */
@@ -1487,11 +1612,13 @@ code {
     padding: clamp(10px, 2.5vw, 14px);
   }
 
-  /* 移动端表格自适应优化 */
+  /* 移动端表格完全自适应 */
   table {
     width: 100%;
+    max-width: 100%;
     min-width: 100%;
     table-layout: auto;
+    box-sizing: border-box;
   }
 
   th,
@@ -1501,6 +1628,8 @@ code {
     white-space: normal;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    box-sizing: border-box;
+    max-width: 100%;
   }
 
   /* 表头也允许换行 */
@@ -1591,10 +1720,68 @@ code {
 
   .table-scroll {
     border-radius: clamp(14px, 3vw, 18px) clamp(14px, 3vw, 18px) 0 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    box-sizing: border-box;
   }
 
   .table-wrapper {
     min-height: clamp(200px, 40vw, 260px);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* 竖屏模式下严格控制表格宽度 */
+  table {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    /* 允许收缩 */
+    table-layout: fixed;
+    /* 使用固定布局避免宽度计算问题 */
+    box-sizing: border-box;
+  }
+
+  th,
+  td {
+    width: auto;
+    /* 让列宽自动分配 */
+    min-width: 0;
+    /* 允许收缩 */
+    max-width: none;
+    /* 移除最大宽度限制 */
+    padding: clamp(6px, 1.5vw, 10px) clamp(4px, 1vw, 8px);
+    font-size: clamp(11px, 2.5vw, 14px);
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    box-sizing: border-box;
+    hyphens: auto;
+    line-height: 1.2;
+  }
+
+  /* 竖屏下的列宽优化 - 平均分配 */
+  th.col-file,
+  td.col-file,
+  th.col-path,
+  td.col-path {
+    width: 30%;
+  }
+
+  th.col-modified,
+  td.col-modified,
+  th.col-created,
+  td.col-created {
+    width: 20%;
+  }
+
+  th.col-size,
+  td.col-size,
+  th.col-attributes,
+  td.col-attributes {
+    width: 10%;
   }
 
   .table-footer {
