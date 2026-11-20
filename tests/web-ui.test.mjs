@@ -264,12 +264,25 @@ test("Web UI static mode (empty config): makes zero EFU requests, shows zero err
     assert.equal(manualCheck.xss, undefined);
     assert.equal(manualCheck.linksInTable, 0);
 
-    // Theme switching works (light / dark / mac)
-    await page.evaluate(() => {
+    // Theme switching stays in Settings (system / light / dark, no macOS or top-bar quick toggle)
+    const themeCheck = await page.evaluate(() => {
+      const hasQuickToggle = Boolean(document.getElementById("theme-quick-toggle"));
+      const options = Array.from(document.querySelectorAll("[data-theme-option]")).map(
+        (el) => el.dataset.themeOption
+      );
       document.querySelector('[data-theme-option="dark"]').click();
+      const darkApplied = document.documentElement.classList.contains("theme-dark");
+      document.querySelector('[data-theme-option="light"]').click();
+      const lightApplied = document.documentElement.classList.contains("theme-light");
+      document.querySelector('[data-theme-option="system"]').click();
+      const systemStored = document.documentElement.dataset.themeChoice;
+      return { hasQuickToggle, options, darkApplied, lightApplied, systemStored };
     });
-    const hasDark = await page.evaluate(() => document.documentElement.classList.contains("theme-dark"));
-    assert.equal(hasDark, true);
+    assert.equal(themeCheck.hasQuickToggle, false);
+    assert.deepEqual(themeCheck.options, ["system", "light", "dark"]);
+    assert.equal(themeCheck.darkApplied, true);
+    assert.equal(themeCheck.lightApplied, true);
+    assert.equal(themeCheck.systemStored, "system");
   } finally {
     await page.close();
     await browser.close();

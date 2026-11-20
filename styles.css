@@ -106,43 +106,6 @@
   --shadow-panel: 0 24px 64px rgba(0, 0, 0, 0.65);
 }
 
-/* Refined macOS frosted glass theme */
-:root.theme-mac {
-  color-scheme: light;
-  --bg: #eef2f6;
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-subtle: rgba(255, 255, 255, 0.56);
-  --surface-hover: rgba(10, 132, 255, 0.08);
-
-  --text-primary: #141b26;
-  --text-secondary: #526074;
-  --text-muted: #768499;
-
-  --primary: #0a84ff;
-  --primary-foreground: #ffffff;
-  --accent: #0a84ff;
-  --accent-soft: rgba(10, 132, 255, 0.12);
-
-  --border: rgba(15, 23, 42, 0.1);
-  --border-strong: rgba(15, 23, 42, 0.18);
-  --ring: rgba(10, 132, 255, 0.35);
-
-  --table-header-bg: rgba(247, 249, 252, 0.86);
-  --footer-bg: rgba(255, 255, 255, 0.72);
-  --loader-backdrop: rgba(238, 242, 246, 0.76);
-  --overlay-bg: rgba(15, 23, 42, 0.24);
-  --code-bg: rgba(15, 23, 42, 0.06);
-
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 12px 30px -16px rgba(15, 23, 42, 0.18);
-  --shadow-panel: 0 24px 56px -16px rgba(15, 23, 42, 0.28);
-}
-
-:root.theme-mac :is(.hero, .toolbar, .panel, .table-wrapper, .footer, .column-popover) {
-  backdrop-filter: saturate(1.6) blur(22px);
-  -webkit-backdrop-filter: saturate(1.6) blur(22px);
-}
-
 .hidden {
   display: none !important;
 }
@@ -165,10 +128,6 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg);
-}
-
-html.theme-mac {
-  background: linear-gradient(155deg, #f3f6fa 0%, #e7eef6 55%, #edf2f8 100%);
 }
 
 body {
@@ -233,13 +192,6 @@ code {
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
-}
-
-:root.theme-mac .top-nav,
-:root.theme-mac .scans-section,
-:root.theme-mac .scan-card {
-  backdrop-filter: saturate(1.6) blur(22px);
-  -webkit-backdrop-filter: saturate(1.6) blur(22px);
 }
 
 .top-nav-left {
@@ -921,8 +873,8 @@ button:disabled {
   background: linear-gradient(135deg, #141414 50%, #0a0a0a 50%);
 }
 
-.theme-swatch-mac {
-  background: linear-gradient(135deg, #f3f6fa 50%, #0a84ff 50%);
+.theme-swatch-system {
+  background: linear-gradient(135deg, #ffffff 50%, #141414 50%);
 }
 
 .theme-label {
@@ -1903,11 +1855,5 @@ td.hidden-column {
     right: auto;
     left: 50%;
     transform: translateX(-50%);
-  }
-}
-
-@supports not (backdrop-filter: blur(2px)) {
-  :root.theme-mac :is(.top-nav, .hero, .toolbar, .panel, .table-wrapper, .footer, .column-popover, .scan-card) {
-    background: rgba(255, 255, 255, 0.94);
   }
 }

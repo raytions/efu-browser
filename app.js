@@ -17,12 +17,20 @@ const COLUMN_CLASSES = {
   Attributes: "col-attributes",
 };
 
-const THEME_SEQUENCE = ["light", "dark", "mac"];
+const THEME_SEQUENCE = ["system", "light", "dark"];
 const THEME_META = {
-  light: { label: "明亮", className: "theme-light" },
-  dark: { label: "暗黑", className: "theme-dark" },
-  mac: { label: "macOS", className: "theme-mac" },
+  system: { label: "跟随系统" },
+  light: { label: "亮色" },
+  dark: { label: "暗黑" },
 };
+
+function getSystemPrefersDark() {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
+}
 
 function resolveInitialTheme() {
   try {
@@ -33,12 +41,7 @@ function resolveInitialTheme() {
   } catch {
     // 忽略存储异常
   }
-  if (typeof window !== "undefined" && window.matchMedia) {
-    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      return "dark";
-    }
-  }
-  return "light";
+  return "system";
 }
 
 const state = {
@@ -116,7 +119,6 @@ const refs = {
   openSource: document.getElementById("open-source"),
   closeCurrent: document.getElementById("close-current"),
   closeSource: document.getElementById("close-source"),
-  themeQuickToggle: document.getElementById("theme-quick-toggle"),
   openSettings: document.getElementById("open-settings"),
   closeSettings: document.getElementById("close-settings"),
   overlay: document.getElementById("dialog-overlay"),
@@ -1006,15 +1008,22 @@ function renderSearchFeedback() {
   }
 }
 
+function resolveEffectiveTheme(choice) {
+  if (choice === "dark") return "dark";
+  if (choice === "light") return "light";
+  return getSystemPrefersDark() ? "dark" : "light";
+}
+
 function applyTheme() {
-  const meta = THEME_META[state.theme] || THEME_META.light;
+  const choice = THEME_SEQUENCE.includes(state.theme) ? state.theme : "system";
+  state.theme = choice;
+  const effective = resolveEffectiveTheme(choice);
   const root = document.documentElement;
-  root.classList.remove("theme-light", "theme-dark", "theme-mac");
-  if (meta.className) {
-    root.classList.add(meta.className);
-  }
+  root.classList.remove("theme-light", "theme-dark");
+  root.classList.add(effective === "dark" ? "theme-dark" : "theme-light");
+  root.dataset.themeChoice = choice;
   try {
-    localStorage.setItem("efu-theme", state.theme);
+    localStorage.setItem("efu-theme", choice);
   } catch {
     // 忽略存储失败
   }
@@ -1022,7 +1031,7 @@ function applyTheme() {
 }
 
 function updateThemeOptions() {
-  const meta = THEME_META[state.theme] || THEME_META.light;
+  const meta = THEME_META[state.theme] || THEME_META.system;
   if (refs.themeOptions) {
     refs.themeOptions.forEach((button) => {
       const target = button.dataset.themeOption;
@@ -1031,19 +1040,9 @@ function updateThemeOptions() {
       button.setAttribute("aria-pressed", active ? "true" : "false");
     });
   }
-  if (refs.themeQuickToggle) {
-    refs.themeQuickToggle.title = `切换主题（当前：${meta.label}）`;
-    refs.themeQuickToggle.setAttribute("aria-label", `切换主题（当前：${meta.label}）`);
-  }
   if (refs.openSettings) {
     refs.openSettings.setAttribute("aria-label", `打开设置（当前主题：${meta.label}）`);
   }
-}
-
-function cycleTheme() {
-  const currentIndex = THEME_SEQUENCE.indexOf(state.theme);
-  state.theme = THEME_SEQUENCE[(currentIndex + 1) % THEME_SEQUENCE.length];
-  applyTheme();
 }
 
 function showUploadProgress(label) {
@@ -1293,8 +1292,18 @@ function bindEvents() {
   if (refs.closeSource) {
     refs.closeSource.addEventListener("click", closePanels);
   }
-  if (refs.themeQuickToggle) {
-    refs.themeQuickToggle.addEventListener("click", cycleTheme);
+  if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+    const colorSchemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemThemeChange = () => {
+      if (state.theme === "system") {
+        applyTheme();
+      }
+    };
+    if (typeof colorSchemeQuery.addEventListener === "function") {
+      colorSchemeQuery.addEventListener("change", handleSystemThemeChange);
+    } else if (typeof colorSchemeQuery.addListener === "function") {
+      colorSchemeQuery.addListener(handleSystemThemeChange);
+    }
   }
   if (refs.openSettings) {
     refs.openSettings.addEventListener("click", () => {

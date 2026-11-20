@@ -31,12 +31,6 @@
         </div>
       </div>
       <div class="top-nav-actions">
-        <button id="theme-quick-toggle" class="toolbar-icon" type="button" aria-label="切换主题" title="切换主题">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-          </svg>
-        </button>
         <button id="open-settings" class="toolbar-icon" type="button" aria-label="打开设置" title="打开设置">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
@@ -271,17 +265,17 @@
         <section class="panel-section">
           <h3>主题风格</h3>
           <div class="theme-options">
+            <button type="button" class="theme-option" data-theme-option="system">
+              <span class="theme-swatch theme-swatch-system" aria-hidden="true"></span>
+              <span class="theme-label">跟随系统</span>
+            </button>
             <button type="button" class="theme-option" data-theme-option="light">
               <span class="theme-swatch theme-swatch-light" aria-hidden="true"></span>
-              <span class="theme-label">明亮</span>
+              <span class="theme-label">亮色</span>
             </button>
             <button type="button" class="theme-option" data-theme-option="dark">
               <span class="theme-swatch theme-swatch-dark" aria-hidden="true"></span>
               <span class="theme-label">暗黑</span>
-            </button>
-            <button type="button" class="theme-option" data-theme-option="mac">
-              <span class="theme-swatch theme-swatch-mac" aria-hidden="true"></span>
-              <span class="theme-label">macOS</span>
             </button>
           </div>
         </section>

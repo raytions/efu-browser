@@ -22,7 +22,7 @@ Linux 本地目录 / 已挂载的 SMB 或 NFS 共享
   - 复用 `gdu`（已验证 `v5.39.0`）保留表观文件大小（`Size`）与修改时间（`Date Modified`，Windows FILETIME）。
   - 严格校验退出码、stderr、`gdu` 日志与 JSON `read_error` 标记，拒绝把权限错误或截断输出当成完整快照发布。
   - 支持目录剪枝排除（`--exclude`）、基于 `/proc/self/mountinfo` 的真实挂载点双重校验（`--require-mount`）、边界安全的导出路径前缀改写（`--export-prefix`），以及同目录临时文件 + `rename` 原子发布。
-- **主题与界面**：提供明亮、暗黑（参考 [freellmapi](https://github.com/tashfeenahmed/freellmapi) 中性深色体系）与 macOS 三套主题，支持模糊/通配符/正则搜索、`file:`/`path:`/`!` 语法、列显示控制与双击复制路径。
+- **主题与界面**：支持跟随系统 / 亮色 / 暗黑（参考 [freellmapi](https://github.com/tashfeenahmed/freellmapi) 中性深色体系）主题切换，支持模糊/通配符/正则搜索、`file:`/`path:`/`!` 语法、列显示控制与双击复制路径。
 
 ---
 
