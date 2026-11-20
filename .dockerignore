@@ -4,6 +4,7 @@
 
 # Ignore generated efu files and directories (mounted read-only at runtime)
 *.efu
+!demo/*.efu
 efu/
 indexes/
 

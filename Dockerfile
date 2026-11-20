@@ -6,7 +6,8 @@ COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Clean default nginx html files and copy only static web assets
 RUN rm -rf /usr/share/nginx/html/*
-COPY index.html styles.css efu-core.js app.js config.json /usr/share/nginx/html/
+COPY index.html styles.css efu-core.js scans-demo-service.js scans-view.js app.js config.json /usr/share/nginx/html/
+COPY demo /usr/share/nginx/html/demo
 
 EXPOSE 80
 

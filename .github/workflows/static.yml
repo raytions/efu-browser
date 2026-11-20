@@ -8,9 +8,12 @@ on:
     paths:
       - 'index.html'
       - 'efu-core.js'
+      - 'scans-demo-service.js'
+      - 'scans-view.js'
       - 'app.js'
       - 'styles.css'
       - 'config.json'
+      - 'demo/**'
       - 'docs/**'
       - '.github/workflows/static.yml'
   workflow_dispatch:
@@ -39,9 +42,15 @@ jobs:
           mkdir -p public
           cp index.html public/
           cp efu-core.js public/
+          cp scans-demo-service.js public/
+          cp scans-view.js public/
           cp app.js public/
           cp styles.css public/
           cp config.json public/
+          if [ -d demo ]; then
+            mkdir -p public/demo
+            rsync -av --delete demo/ public/demo/
+          fi
           if [ -d docs ]; then
             mkdir -p public/docs
             rsync -av --delete docs/ public/docs/

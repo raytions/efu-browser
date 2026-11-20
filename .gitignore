@@ -1,5 +1,6 @@
 *.efu
 !tests/fixtures/*.efu
+!demo/*.efu
 indexes/
 efu/
 node_modules/

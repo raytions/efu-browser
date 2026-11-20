@@ -1,4 +1,6 @@
 const Core = typeof window !== "undefined" ? window.EfuCore : null;
+const ScansDemoService = typeof window !== "undefined" ? window.EfuScansDemoService : null;
+const ScansView = typeof window !== "undefined" ? window.EfuScansView : null;
 
 const RUNTIME_CONFIG_FILE = "config.json";
 const DEFAULT_PAGE_SIZE = 20;
@@ -40,6 +42,7 @@ function resolveInitialTheme() {
 }
 
 const state = {
+  currentRoute: "browser",
   entries: [],
   filtered: [],
   sortKey: "FileName",
@@ -50,6 +53,7 @@ const state = {
   activeSource: null,
   activeLoadId: 0,
   activeAbortController: null,
+  demoSuggestedSearch: null,
   regexSearch: false,
   regexError: null,
   pageSize: DEFAULT_PAGE_SIZE,
@@ -70,6 +74,15 @@ const state = {
 };
 
 const refs = {
+  browserView: document.getElementById("browser-view"),
+  scansView: document.getElementById("scans-view"),
+  navBrowser: document.getElementById("nav-browser"),
+  navScans: document.getElementById("nav-scans"),
+  routeLinks: Array.from(document.querySelectorAll("[data-route]")),
+  demoHintBanner: document.getElementById("demo-hint-banner"),
+  demoHintText: document.getElementById("demo-hint-text"),
+  demoHintApply: document.getElementById("demo-hint-apply"),
+  demoHintDismiss: document.getElementById("demo-hint-dismiss"),
   totalCount: document.getElementById("total-count"),
   filteredCount: document.getElementById("filtered-count"),
   filteredSize: document.getElementById("filtered-size"),
@@ -126,11 +139,83 @@ const refs = {
 };
 
 let copyToastTimer = null;
+let scansServiceInstance = null;
+let scansViewInstance = null;
+
+function resolveRouteFromLocation() {
+  if (typeof window === "undefined") return "browser";
+  const rawHash = (window.location.hash || "").replace(/^#/, "").trim().toLowerCase();
+  const normalizedHash = rawHash.replace(/^\/+/, "").replace(/\/+$/, "");
+  if (normalizedHash === "scans") {
+    return "scans";
+  }
+  if (normalizedHash === "browser") {
+    return "browser";
+  }
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if ((params.get("view") || "").toLowerCase() === "scans") {
+      return "scans";
+    }
+  } catch {
+    // 忽略查询参数解析异常
+  }
+  return "browser";
+}
+
+function navigateTo(route, { updateHash = true } = {}) {
+  const targetRoute = route === "scans" ? "scans" : "browser";
+  state.currentRoute = targetRoute;
+
+  if (refs.browserView) {
+    refs.browserView.classList.toggle("hidden", targetRoute !== "browser");
+  }
+  if (refs.scansView) {
+    refs.scansView.classList.toggle("hidden", targetRoute !== "scans");
+  }
+  if (refs.navBrowser) {
+    const active = targetRoute === "browser";
+    refs.navBrowser.classList.toggle("active", active);
+    if (active) refs.navBrowser.setAttribute("aria-current", "page");
+    else refs.navBrowser.removeAttribute("aria-current");
+  }
+  if (refs.navScans) {
+    const active = targetRoute === "scans";
+    refs.navScans.classList.toggle("active", active);
+    if (active) refs.navScans.setAttribute("aria-current", "page");
+    else refs.navScans.removeAttribute("aria-current");
+  }
+
+  if (updateHash && typeof window !== "undefined") {
+    const desiredHash = targetRoute === "scans" ? "#/scans" : "#/browser";
+    if (window.location.hash !== desiredHash) {
+      window.location.hash = desiredHash;
+    }
+  }
+}
+
+function initScansSection() {
+  if (!refs.scansView || !ScansDemoService || !ScansView) return;
+  const serviceOptions =
+    typeof window !== "undefined" && window.EFU_SCANS_DEMO_OPTIONS
+      ? window.EFU_SCANS_DEMO_OPTIONS
+      : undefined;
+  scansServiceInstance = ScansDemoService.createDemoScansService(serviceOptions);
+  scansViewInstance = ScansView.createScansView({
+    container: refs.scansView,
+    service: scansServiceInstance,
+    onOpenResult: (payload) => {
+      openDemoResult(payload);
+    },
+  });
+}
 
 async function init() {
   bindEvents();
   initialiseControls();
   applyTheme();
+  initScansSection();
+  navigateTo(resolveRouteFromLocation(), { updateHash: false });
 
   await new Promise((resolve) => {
     if (document.readyState === "loading") {
@@ -291,13 +376,40 @@ function hideStatusBanner() {
   refs.statusBanner.classList.add("hidden");
 }
 
-async function loadServerIndex(indexId, { isReload = false } = {}) {
-  const target = state.serverIndexes.find((item) => item.id === indexId);
-  if (!target) {
-    showStatusBanner("未找到指定的服务器索引配置。");
-    return false;
+function showDemoHintBanner(label, suggestedSearch) {
+  state.demoSuggestedSearch = suggestedSearch || null;
+  if (!refs.demoHintBanner || !refs.demoHintText) return;
+  if (suggestedSearch) {
+    refs.demoHintText.textContent = `已加载「${label}」，建议搜索 ${suggestedSearch} 查看本次模拟扫描新增的文件。`;
+    if (refs.demoHintApply) {
+      refs.demoHintApply.textContent = `搜索 ${suggestedSearch}`;
+      refs.demoHintApply.classList.remove("hidden");
+    }
+  } else {
+    refs.demoHintText.textContent = `已加载「${label}」（虚构演示数据，不涉及真实设备或 NAS）。`;
+    if (refs.demoHintApply) {
+      refs.demoHintApply.classList.add("hidden");
+    }
   }
+  refs.demoHintBanner.classList.remove("hidden");
+}
 
+function hideDemoHintBanner() {
+  state.demoSuggestedSearch = null;
+  if (!refs.demoHintBanner || !refs.demoHintText) return;
+  refs.demoHintText.textContent = "";
+  refs.demoHintBanner.classList.add("hidden");
+}
+
+async function loadRemoteEfu({
+  url,
+  displayPath,
+  label,
+  type = "server",
+  id = null,
+  isReload = false,
+  suggestedSearch = null,
+}) {
   // 竞态保护：每次加载分配递增 ID 并中止前一个在途请求
   const loadId = ++state.activeLoadId;
   if (state.activeAbortController) {
@@ -310,12 +422,16 @@ async function loadServerIndex(indexId, { isReload = false } = {}) {
   const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
   state.activeAbortController = controller;
 
-  syncServerIndexSelectors(target.id);
+  if (type === "server" && id) {
+    syncServerIndexSelectors(id);
+  }
   hideStatusBanner();
-  showLoader(true, `${isReload ? "正在重新加载" : "正在加载"}「${target.name}」...`);
-  setServerLoadingStatus(isReload ? "正在刷新快照..." : "正在加载...");
-  if (refs.reloadServerIndex) {
-    refs.reloadServerIndex.disabled = true;
+  showLoader(true, `${isReload ? "正在重新加载" : "正在加载"}「${label}」...`);
+  if (type === "server") {
+    setServerLoadingStatus(isReload ? "正在刷新快照..." : "正在加载...");
+    if (refs.reloadServerIndex) {
+      refs.reloadServerIndex.disabled = true;
+    }
   }
 
   try {
@@ -324,7 +440,7 @@ async function loadServerIndex(indexId, { isReload = false } = {}) {
       fetchOptions.signal = controller.signal;
     }
 
-    const response = await fetch(target.url, fetchOptions);
+    const response = await fetch(url, fetchOptions);
     if (loadId !== state.activeLoadId) {
       return false;
     }
@@ -339,17 +455,23 @@ async function loadServerIndex(indexId, { isReload = false } = {}) {
     }
 
     const lastModifiedHeader = response.headers ? response.headers.get("Last-Modified") : null;
-    const snapshotModified = Core.formatHttpTimestamp(lastModifiedHeader);
+    const snapshotModified = type === "demo" ? null : Core.formatHttpTimestamp(lastModifiedHeader);
 
     // 解析与提交统一走 ingestContent；若解析抛错则不会覆盖旧状态
     ingestContent(text, {
-      type: "server",
-      id: target.id,
-      label: target.name,
-      path: target.displayPath,
-      url: target.url,
+      type,
+      id,
+      label,
+      path: displayPath || url,
+      url,
       snapshotModified,
     });
+
+    if (type === "demo") {
+      showDemoHintBanner(label, suggestedSearch);
+    } else {
+      hideDemoHintBanner();
+    }
 
     if (refs.uploadName) {
       refs.uploadName.textContent = "选择本地 .efu 文件进行浏览";
@@ -367,7 +489,7 @@ async function loadServerIndex(indexId, { isReload = false } = {}) {
     // 加载或解析失败：保留现有已加载的结果，只显示可读错误提示
     const detail = error && error.message ? error.message : "网络或解析异常";
     const keepHint = state.activeSource ? "（已保留当前显示结果）" : "";
-    showStatusBanner(`加载索引「${target.name}」失败：${detail}${keepHint}`);
+    showStatusBanner(`加载索引「${label}」失败：${detail}${keepHint}`);
 
     // 若当前已有其他服务器索引在展示，保持状态清晰
     if (state.activeSource && state.activeSource.type === "server" && state.activeSource.id) {
@@ -384,6 +506,41 @@ async function loadServerIndex(indexId, { isReload = false } = {}) {
       }
     }
   }
+}
+
+async function loadServerIndex(indexId, { isReload = false } = {}) {
+  const target = state.serverIndexes.find((item) => item.id === indexId);
+  if (!target) {
+    showStatusBanner("未找到指定的服务器索引配置。");
+    return false;
+  }
+  return loadRemoteEfu({
+    url: target.url,
+    displayPath: target.displayPath,
+    label: target.name,
+    type: "server",
+    id: target.id,
+    isReload,
+  });
+}
+
+async function openDemoResult({ url, label, suggestedSearch = null } = {}) {
+  const resolved = Core.resolveSameOriginUrl(url, window.location.href);
+  if (!resolved.ok) {
+    navigateTo("browser");
+    showStatusBanner(`无法打开演示快照：${resolved.error}`);
+    return false;
+  }
+  navigateTo("browser");
+  return loadRemoteEfu({
+    url: resolved.url,
+    displayPath: resolved.displayPath,
+    label: label || "演示快照",
+    type: "demo",
+    id: null,
+    isReload: false,
+    suggestedSearch,
+  });
 }
 
 function ingestContent(text, sourceMeta) {
@@ -412,12 +569,15 @@ function ingestContent(text, sourceMeta) {
   state.page = state.filtered.length ? 1 : 0;
 
   hideStatusBanner();
+  if (!sourceMeta || sourceMeta.type !== "demo") {
+    hideDemoHintBanner();
+  }
   render();
   updateSortIndicators();
   setActiveSource(sourceMeta);
 
-  // 仅缓存本地手动导入的小型快照；服务器索引每次以实时快照为准
-  if (sourceMeta && sourceMeta.type !== "server") {
+  // 仅缓存本地手动导入的小型快照；服务器索引与演示快照不写入本地缓存
+  if (sourceMeta && (sourceMeta.type === "local" || sourceMeta.type === "upload")) {
     saveCachedData();
   }
 }
@@ -831,6 +991,7 @@ function closeCurrentFile() {
   state.activeSource = null;
   setActiveSource(null);
   hideStatusBanner();
+  hideDemoHintBanner();
   render();
 }
 
@@ -1248,6 +1409,36 @@ function bindEvents() {
       render();
     });
   }
+  refs.routeLinks.forEach((link) => {
+    link.addEventListener("click", (event) => {
+      const targetRoute = link.dataset.route;
+      if (!targetRoute) return;
+      event.preventDefault();
+      navigateTo(targetRoute, { updateHash: true });
+    });
+  });
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("hashchange", () => {
+      navigateTo(resolveRouteFromLocation(), { updateHash: false });
+    });
+  }
+
+  if (refs.demoHintApply) {
+    refs.demoHintApply.addEventListener("click", () => {
+      if (!state.demoSuggestedSearch) return;
+      if (refs.searchInput) {
+        refs.searchInput.value = state.demoSuggestedSearch;
+        refs.searchInput.focus();
+      }
+      applySearch(state.demoSuggestedSearch);
+    });
+  }
+
+  if (refs.demoHintDismiss) {
+    refs.demoHintDismiss.addEventListener("click", hideDemoHintBanner);
+  }
+
   refs.columnToggles.forEach((toggle) =>
     toggle.addEventListener("change", (event) => {
       const key = event.target.dataset.columnToggle;
@@ -1275,10 +1466,13 @@ function handleFileUpload(event) {
 if (typeof window !== "undefined") {
   window.__efuApp = {
     state,
+    navigateTo,
     loadServerIndex,
+    openDemoResult,
     ingestContent,
     applySearch,
     loadRuntimeConfig,
+    getScansService: () => scansServiceInstance,
   };
   init();
 }

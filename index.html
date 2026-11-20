@@ -10,113 +10,228 @@
 
 <body>
   <div class="app-shell">
-    <header class="hero">
-      <div class="hero-main">
-        <div class="hero-text">
-          <div class="brand-row">
-            <span class="brand-mark" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
-                <circle cx="11.5" cy="13.5" r="2.5" />
-                <path d="m13.3 15.3 1.7 1.7" />
-              </svg>
-            </span>
-            <h1>Everything 文件浏览器</h1>
-          </div>
-          <p class="hero-subtitle">浏览并检索 Everything 或 Linux/NAS 扫描发布的 EFU 文件快照。</p>
-          <div class="source-meta-line">
-            <span class="active-source">当前数据源：<span id="active-source">尚未加载</span></span>
-            <span id="snapshot-modified" class="snapshot-badge hidden"></span>
-          </div>
-        </div>
-
-        <div class="hero-meta">
-          <div class="metric">
-            <span class="metric-label">总条目数</span>
-            <span class="metric-value tabular-nums" id="total-count">—</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">匹配结果</span>
-            <span class="metric-value tabular-nums" id="filtered-count">—</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">已知文件总大小</span>
-            <span class="metric-value tabular-nums" id="filtered-size">—</span>
-          </div>
-        </div>
-      </div>
-
-      <div id="server-index-bar" class="server-index-bar hidden" aria-label="服务器索引切换">
-        <div class="server-index-controls">
-          <label class="server-index-label" for="server-index-select">服务器索引</label>
-          <select id="server-index-select" class="server-index-select"></select>
-          <button id="reload-server-index" class="btn-secondary" type="button">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
-              <path d="M21 3v5h-5" />
-            </svg>
-            <span>重新加载</span>
-          </button>
-          <span id="server-index-status" class="server-index-status hidden" aria-live="polite"></span>
-        </div>
-      </div>
-    </header>
-
-    <section class="toolbar">
-      <button id="open-source" class="toolbar-button" type="button" aria-label="加载数据源" title="选择数据源或导入本地 EFU">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        <span class="toolbar-button-label">数据源</span>
-      </button>
-      <button id="close-current" class="toolbar-button toolbar-button-subtle" type="button" aria-label="关闭当前文件" title="关闭当前数据源" style="display: none;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M18 6 6 18M6 6l12 12" />
-        </svg>
-        <span class="toolbar-button-label">关闭</span>
-      </button>
-      <div class="search">
-        <div class="search-box">
-          <span class="icon" aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
+    <nav class="top-nav" aria-label="主导航">
+      <div class="top-nav-left">
+        <a class="top-brand" href="#/browser" data-route="browser">
+          <span class="brand-mark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+              <circle cx="11.5" cy="13.5" r="2.5" />
+              <path d="m13.3 15.3 1.7 1.7" />
             </svg>
           </span>
-          <input id="search-input" type="search" placeholder="搜索示例：*.pdf !temp file:report path:/projects 或 path:\\nas"
-            autocomplete="off" />
-          <button id="clear-search" type="button" aria-label="清除搜索" title="清除搜索">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
+          <span class="top-brand-name">EFU Browser</span>
+        </a>
+        <div class="nav-tabs" role="tablist" aria-label="视图切换">
+          <a id="nav-browser" class="nav-tab active" href="#/browser" data-route="browser" aria-current="page">Browser</a>
+          <a id="nav-scans" class="nav-tab" href="#/scans" data-route="scans">
+            <span>Scans</span>
+            <span class="nav-demo-pill">演示</span>
+          </a>
         </div>
-        <p id="search-error" class="search-error hidden" role="alert"></p>
       </div>
-      <button id="theme-quick-toggle" class="toolbar-icon" type="button" aria-label="切换主题" title="切换主题">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="4" />
-          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-        </svg>
-      </button>
-      <button id="open-settings" class="toolbar-icon" type="button" aria-label="打开设置" title="打开设置">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      </button>
-      <div id="upload-progress" class="upload-progress hidden" aria-hidden="true">
-        <div class="progress-track">
-          <div id="upload-progress-bar" class="progress-bar"></div>
-        </div>
-        <span id="upload-progress-text" class="tabular-nums">0%</span>
+      <div class="top-nav-actions">
+        <button id="theme-quick-toggle" class="toolbar-icon" type="button" aria-label="切换主题" title="切换主题">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+          </svg>
+        </button>
+        <button id="open-settings" class="toolbar-icon" type="button" aria-label="打开设置" title="打开设置">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
       </div>
-    </section>
+    </nav>
 
-    <div id="status-banner" class="status-banner hidden" role="alert" aria-live="assertive">
-      <span id="status-banner-text"></span>
-      <button id="status-banner-dismiss" class="status-banner-dismiss" type="button" aria-label="关闭提示">✕</button>
+    <div id="browser-view" class="view-section">
+      <header class="hero">
+        <div class="hero-main">
+          <div class="hero-text">
+            <h1>Everything 文件浏览器</h1>
+            <p class="hero-subtitle">浏览并检索 Everything 或 Linux/NAS 扫描发布的 EFU 文件快照。</p>
+            <div class="source-meta-line">
+              <span class="active-source">当前数据源：<span id="active-source">尚未加载</span></span>
+              <span id="snapshot-modified" class="snapshot-badge hidden"></span>
+            </div>
+          </div>
+
+          <div class="hero-meta">
+            <div class="metric">
+              <span class="metric-label">总条目数</span>
+              <span class="metric-value tabular-nums" id="total-count">—</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">匹配结果</span>
+              <span class="metric-value tabular-nums" id="filtered-count">—</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">已知文件总大小</span>
+              <span class="metric-value tabular-nums" id="filtered-size">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="server-index-bar" class="server-index-bar hidden" aria-label="服务器索引切换">
+          <div class="server-index-controls">
+            <label class="server-index-label" for="server-index-select">服务器索引</label>
+            <select id="server-index-select" class="server-index-select"></select>
+            <button id="reload-server-index" class="btn-secondary" type="button">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+              <span>重新加载</span>
+            </button>
+            <span id="server-index-status" class="server-index-status hidden" aria-live="polite"></span>
+          </div>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <button id="open-source" class="toolbar-button" type="button" aria-label="加载数据源" title="选择数据源或导入本地 EFU">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          <span class="toolbar-button-label">数据源</span>
+        </button>
+        <button id="close-current" class="toolbar-button toolbar-button-subtle" type="button" aria-label="关闭当前文件" title="关闭当前数据源" style="display: none;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+          <span class="toolbar-button-label">关闭</span>
+        </button>
+        <div class="search">
+          <div class="search-box">
+            <span class="icon" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </span>
+            <input id="search-input" type="search" placeholder="搜索示例：*.pdf !temp file:report path:/projects 或 path:\\nas"
+              autocomplete="off" />
+            <button id="clear-search" type="button" aria-label="清除搜索" title="清除搜索">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p id="search-error" class="search-error hidden" role="alert"></p>
+        </div>
+        <div id="upload-progress" class="upload-progress hidden" aria-hidden="true">
+          <div class="progress-track">
+            <div id="upload-progress-bar" class="progress-bar"></div>
+          </div>
+          <span id="upload-progress-text" class="tabular-nums">0%</span>
+        </div>
+      </section>
+
+      <div id="demo-hint-banner" class="demo-hint-banner hidden" role="status" aria-live="polite">
+        <div class="demo-hint-content">
+          <span class="scans-demo-badge">演示快照</span>
+          <span id="demo-hint-text"></span>
+        </div>
+        <div class="demo-hint-actions">
+          <button id="demo-hint-apply" class="btn-secondary btn-compact" type="button">搜索新增文件</button>
+          <button id="demo-hint-dismiss" class="status-banner-dismiss" type="button" aria-label="关闭演示提示">✕</button>
+        </div>
+      </div>
+
+      <div id="status-banner" class="status-banner hidden" role="alert" aria-live="assertive">
+        <span id="status-banner-text"></span>
+        <button id="status-banner-dismiss" class="status-banner-dismiss" type="button" aria-label="关闭提示">✕</button>
+      </div>
+
+      <section class="table-wrapper" id="table-wrapper">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-file" data-sort="FileName">文件名</th>
+                <th class="col-path" data-sort="Path">路径</th>
+                <th class="col-size" data-sort="Size">大小</th>
+                <th class="col-modified" data-sort="Date Modified">修改时间</th>
+                <th class="col-created" data-sort="Date Created">创建时间</th>
+                <th class="col-attributes" data-sort="Attributes">属性</th>
+              </tr>
+            </thead>
+            <tbody id="results"></tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <div class="pagination">
+            <button id="prev-page" type="button">上一页</button>
+            <span class="page-info tabular-nums">
+              第 <span id="current-page">0</span> / <span id="total-pages">0</span> 页
+            </span>
+            <button id="next-page" type="button">下一页</button>
+            <label class="page-jump">
+              跳转
+              <input id="page-jump" type="number" min="1" step="1" />
+            </label>
+          </div>
+          <div class="table-actions">
+            <div class="page-size">
+              <label for="page-size">每页</label>
+              <select id="page-size">
+                <option value="20" selected>20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+              </select>
+              <span class="page-size-unit">条</span>
+            </div>
+            <div class="column-popover-wrapper">
+              <button id="column-settings-toggle" class="table-gear" type="button" aria-label="列显示设置" title="列显示设置">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M9 3v18M15 3v18" />
+                </svg>
+              </button>
+              <div id="column-popover" class="column-popover hidden" role="menu">
+                <h4>显示列</h4>
+                <div class="column-list">
+                  <label class="column-toggle">
+                    <input type="checkbox" data-column-toggle="FileName" checked />
+                    <span>文件名</span>
+                  </label>
+                  <label class="column-toggle">
+                    <input type="checkbox" data-column-toggle="Path" checked />
+                    <span>路径</span>
+                  </label>
+                  <label class="column-toggle">
+                    <input type="checkbox" data-column-toggle="Size" checked />
+                    <span>大小</span>
+                  </label>
+                  <label class="column-toggle">
+                    <input type="checkbox" data-column-toggle="Date Modified" checked />
+                    <span>修改时间</span>
+                  </label>
+                  <label class="column-toggle">
+                    <input type="checkbox" data-column-toggle="Date Created" checked />
+                    <span>创建时间</span>
+                  </label>
+                  <label class="column-toggle">
+                    <input type="checkbox" data-column-toggle="Attributes" checked />
+                    <span>属性</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="loader" class="loader hidden">
+          <span class="spinner"></span>
+          <span id="loader-text">载入中，请稍候...</span>
+        </div>
+      </section>
     </div>
+
+    <section id="scans-view" class="view-section scans-section hidden" aria-label="扫描任务演示"></section>
 
     <div id="dialog-overlay" class="overlay hidden"></div>
 
@@ -189,91 +304,6 @@
       </div>
     </div>
 
-    <section class="table-wrapper" id="table-wrapper">
-      <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th class="col-file" data-sort="FileName">文件名</th>
-              <th class="col-path" data-sort="Path">路径</th>
-              <th class="col-size" data-sort="Size">大小</th>
-              <th class="col-modified" data-sort="Date Modified">修改时间</th>
-              <th class="col-created" data-sort="Date Created">创建时间</th>
-              <th class="col-attributes" data-sort="Attributes">属性</th>
-            </tr>
-          </thead>
-          <tbody id="results"></tbody>
-        </table>
-      </div>
-      <div class="table-footer">
-        <div class="pagination">
-          <button id="prev-page" type="button">上一页</button>
-          <span class="page-info tabular-nums">
-            第 <span id="current-page">0</span> / <span id="total-pages">0</span> 页
-          </span>
-          <button id="next-page" type="button">下一页</button>
-          <label class="page-jump">
-            跳转
-            <input id="page-jump" type="number" min="1" step="1" />
-          </label>
-        </div>
-        <div class="table-actions">
-          <div class="page-size">
-            <label for="page-size">每页</label>
-            <select id="page-size">
-              <option value="20" selected>20</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-              <option value="200">200</option>
-              <option value="500">500</option>
-            </select>
-            <span class="page-size-unit">条</span>
-          </div>
-          <div class="column-popover-wrapper">
-            <button id="column-settings-toggle" class="table-gear" type="button" aria-label="列显示设置" title="列显示设置">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <rect width="18" height="18" x="3" y="3" rx="2" />
-                <path d="M9 3v18M15 3v18" />
-              </svg>
-            </button>
-            <div id="column-popover" class="column-popover hidden" role="menu">
-              <h4>显示列</h4>
-              <div class="column-list">
-                <label class="column-toggle">
-                  <input type="checkbox" data-column-toggle="FileName" checked />
-                  <span>文件名</span>
-                </label>
-                <label class="column-toggle">
-                  <input type="checkbox" data-column-toggle="Path" checked />
-                  <span>路径</span>
-                </label>
-                <label class="column-toggle">
-                  <input type="checkbox" data-column-toggle="Size" checked />
-                  <span>大小</span>
-                </label>
-                <label class="column-toggle">
-                  <input type="checkbox" data-column-toggle="Date Modified" checked />
-                  <span>修改时间</span>
-                </label>
-                <label class="column-toggle">
-                  <input type="checkbox" data-column-toggle="Date Created" checked />
-                  <span>创建时间</span>
-                </label>
-                <label class="column-toggle">
-                  <input type="checkbox" data-column-toggle="Attributes" checked />
-                  <span>属性</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div id="loader" class="loader hidden">
-        <span class="spinner"></span>
-        <span id="loader-text">载入中，请稍候...</span>
-      </div>
-    </section>
-
     <footer class="footer">
       <p>
         数据源：<span id="footer-source">—</span> &nbsp;·&nbsp; 双击任意行复制完整路径 &nbsp;·&nbsp;
@@ -285,6 +315,8 @@
   <div id="copy-toast" class="copy-toast hidden" role="status" aria-live="polite"></div>
 
   <script src="efu-core.js" defer></script>
+  <script src="scans-demo-service.js" defer></script>
+  <script src="scans-view.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 

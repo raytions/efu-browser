@@ -137,9 +137,26 @@ journalctl -u efu-scan.service -n 20 --no-pager
 
 ---
 
+## 在线演示（Scans 页面）与真实 CLI 扫描的区别
+
+顶部导航提供 **Browser**（默认入口）与 **Scans**（`#/scans`，兼容 GitHub Pages `/efu-browser/#/scans` 子路径直达与刷新）：
+
+- 在 GitHub Pages 上，**Scans 页面运行在纯前端演示模式**：明确标注「演示模式：这是模拟扫描，不会访问你的设备、服务器或 NAS。」
+- 预置完全虚构的 `Example NAS` 任务与两份小型静态快照：`demo/demo-before.efu`（5 条）与 `demo/demo-after.efu`（6 条，新增 `demo-slide-003.svs`）。
+- 点击「立即扫描」会模拟 `等待 → 扫描中 → 完成`（运行期间禁用重复点击），完成后不会自动覆盖 Browser 中已打开的索引；只有点击「打开结果」才会切回 Browser，复用现有 EFU 加载、解析与搜索逻辑打开 `demo-after.efu`。
+
+| 维度 | Scans 页面（演示模式） | 真实 CLI 扫描（`scripts/efu-scan.mjs`） |
+| --- | --- | --- |
+| 运行位置 | 纯浏览器内存状态机（`scans-demo-service.js`） | Linux 主机 / 容器定时任务（`cron` 或 `systemd timer`） |
+| 访问文件系统 / NAS | **不访问**任何本机、服务器或 NAS | 通过 `gdu` 只读遍历指定 `--root` 目录元数据 |
+| 数据来源 | 随站点发布的完全虚构静态文件（`demo/demo-*.efu`） | 实际扫描结果并原子发布为 `/indexes/*.efu` |
+| 后端依赖 | 无需后端、登录或扫描 API | 依赖主机安装 `gdu` 与 Node.js，Web 端仅同源只读加载 EFU |
+
+---
+
 ## GitHub Pages 纯静态部署与 Windows EFU 兼容
 
-- **GitHub Pages / 纯静态使用**：仓库默认 `config.json` 为 `{"indexes": []}`，部署后不发任何 `.efu` 请求，直接点击“数据源”或空状态卡片打开本地 `.efu` 文件即可浏览。
+- **GitHub Pages / 纯静态使用**：仓库默认 `config.json` 为 `{"indexes": []}`，部署后在 Browser 页面不发任何 `.efu` 请求，直接点击“数据源”或空状态卡片打开本地 `.efu` 文件即可浏览；也可通过顶部 **Scans** 体验交互式模拟扫描演示。
 - **Windows / macOS 生成 EFU**：在 Windows 上可直接用 Everything（`文件 -> 导出 -> EFU`）或官方 `EFUtool` 生成 `.efu`，既可本地打开，也可同步到自托管服务器的 `/indexes/` 目录中并通过 `config.json` 引用。
 
 ---

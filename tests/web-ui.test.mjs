@@ -162,7 +162,14 @@ function createTestServer(handlers) {
     }
     if (!relPath || relPath === "/") relPath = "index.html";
 
-    const allowed = new Set(["index.html", "styles.css", "efu-core.js", "app.js"]);
+    const allowed = new Set([
+      "index.html",
+      "styles.css",
+      "efu-core.js",
+      "scans-demo-service.js",
+      "scans-view.js",
+      "app.js",
+    ]);
     if (allowed.has(relPath)) {
       const ext = path.extname(relPath);
       const mime =
@@ -172,6 +179,12 @@ function createTestServer(handlers) {
             ? "text/css; charset=utf-8"
             : "application/javascript; charset=utf-8";
       res.writeHead(200, { "Content-Type": mime });
+      res.end(fs.readFileSync(path.join(REPO_ROOT, relPath)));
+      return;
+    }
+
+    if (relPath === "demo/demo-before.efu" || relPath === "demo/demo-after.efu") {
+      res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
       res.end(fs.readFileSync(path.join(REPO_ROOT, relPath)));
       return;
     }
@@ -416,3 +429,139 @@ test("Web UI server indexes on subpath: auto-load, switch, reload updated snapsh
     await srv.close();
   }
 });
+
+test("Web UI Scans demo on /efu-browser/ subpath: direct link + reload, simulated scan guard, preserves open Browser EFU, opens demo-after.efu and finds demo-slide-003.svs", { skip: !CHROME_BIN }, async () => {
+  const srv = await createTestServer({
+    basePath: "/efu-browser/",
+    custom: async (pathname, _req, res) => {
+      if (pathname === "/efu-browser/config.json") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ indexes: [] }));
+        return true;
+      }
+      return false;
+    },
+  });
+
+  const browser = await startBrowser();
+  const page = await browser.newPage();
+  try {
+    // 1. Direct entry to Scans on GitHub Pages subpath (#/scans) and refresh works
+    await page.goto(`${srv.origin}/efu-browser/#/scans`);
+    await page.waitFor(() => Boolean(window.__efuApp));
+
+    const directScans = await page.evaluate(() => ({
+      scansVisible: !document.getElementById("scans-view").classList.contains("hidden"),
+      browserHidden: document.getElementById("browser-view").classList.contains("hidden"),
+      demoBadge: document.querySelector("#scans-view .scans-demo-badge")?.textContent,
+      demoDesc: document.querySelector("#scans-view .scans-demo-desc")?.textContent,
+      jobTitle: document.querySelector(".scan-card h3")?.textContent,
+    }));
+    assert.equal(directScans.scansVisible, true);
+    assert.equal(directScans.browserHidden, true);
+    assert.equal(directScans.demoBadge, "演示模式");
+    assert.equal(directScans.demoDesc, "这是模拟扫描，不会访问你的设备、服务器或 NAS。");
+    assert.equal(directScans.jobTitle, "Example NAS");
+
+    // Reload on #/scans stays on Scans
+    await page.evaluate(() => window.location.reload());
+    await page.waitFor(() => Boolean(window.__efuApp) && !document.getElementById("scans-view").classList.contains("hidden"));
+
+    // 2. Switch to Browser, open user's own local EFU first
+    await page.evaluate(() => document.getElementById("nav-browser").click());
+    await page.waitFor(() => !document.getElementById("browser-view").classList.contains("hidden"));
+
+    await page.evaluate(() => {
+      const customEfu =
+        "Filename,Size,Date Modified\r\n" +
+        "/home/user/private-doc.txt,512,134000000000000000\r\n";
+      const file = new File([customEfu], "my-private.efu", { type: "text/plain" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const input = document.getElementById("file-upload");
+      input.files = dt.files;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await page.waitFor(() => document.getElementById("active-source").textContent === "my-private.efu");
+
+    // 3. Switch back to Scans, trigger simulated scan, verify disabled button & duplicate-start block
+    await page.evaluate(() => document.getElementById("nav-scans").click());
+    await page.waitFor(() => !document.getElementById("scans-view").classList.contains("hidden"));
+
+    const duringScan = await page.evaluate(() => {
+      const btn = document.querySelector('[data-action="start-scan"]');
+      btn.click();
+      const afterClickBtn = document.querySelector('[data-action="start-scan"]');
+      const dupAttempt = window.__efuApp.getScansService().startScan("example-nas");
+      return {
+        disabled: afterClickBtn.disabled,
+        status: document.querySelector(".scan-card")?.dataset.status,
+        dupAttempt,
+      };
+    });
+    assert.equal(duringScan.disabled, true);
+    assert.equal(duringScan.status, "queued");
+    assert.deepEqual(duringScan.dupAttempt, { started: false, reason: "already_running" });
+
+    // 4. Wait for simulated scan completion
+    await page.waitFor(
+      () => document.querySelector(".scan-card")?.dataset.status === "completed",
+      6000
+    );
+
+    const afterComplete = await page.evaluate(() => ({
+      openBtnVisible: Boolean(document.querySelector('[data-action="open-result"]')),
+      completionText: document.querySelector(".scan-completion-note")?.textContent,
+      // Browser's open EFU MUST NOT be overwritten before clicking "打开结果"
+      browserActiveSource: document.getElementById("active-source").textContent,
+      browserFirstFile: document.querySelector("#results td.col-file")?.textContent,
+    }));
+    assert.equal(afterComplete.openBtnVisible, true);
+    assert.match(afterComplete.completionText, /demo-slide-003\.svs/);
+    assert.equal(afterComplete.browserActiveSource, "my-private.efu");
+    assert.equal(afterComplete.browserFirstFile, "private-doc.txt");
+
+    // 5. Click "打开结果" -> switches to Browser, loads demo/demo-after.efu, existing search finds demo-slide-003.svs
+    await page.evaluate(() => document.querySelector('[data-action="open-result"]').click());
+    await page.waitFor(
+      () =>
+        !document.getElementById("browser-view").classList.contains("hidden") &&
+        document.getElementById("total-count").textContent === "6"
+    );
+
+    const afterOpen = await page.evaluate(() => ({
+      hash: window.location.hash,
+      activeSource: document.getElementById("active-source").textContent,
+      totalCount: document.getElementById("total-count").textContent,
+      demoHintText: document.getElementById("demo-hint-text").textContent,
+    }));
+    assert.equal(afterOpen.hash, "#/browser");
+    assert.match(afterOpen.activeSource, /Example NAS/);
+    assert.equal(afterOpen.totalCount, "6");
+    assert.match(afterOpen.demoHintText, /demo-slide-003\.svs/);
+
+    // Use existing search input to find demo-slide-003.svs
+    await page.evaluate(() => {
+      const input = document.getElementById("search-input");
+      input.value = "demo-slide-003.svs";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await page.waitFor(() => document.getElementById("filtered-count").textContent === "1");
+
+    const searchRes = await page.evaluate(() => ({
+      matchedFile: document.querySelector("#results td.col-file")?.textContent,
+      matchedPath: document.querySelector("#results td.col-path")?.textContent,
+    }));
+    assert.equal(searchRes.matchedFile, "demo-slide-003.svs");
+    assert.equal(searchRes.matchedPath, "/mnt/example-nas/demo-archive/slides/demo-slide-003.svs");
+
+    // Confirm demo-after.efu was fetched under /efu-browser/ subpath
+    assert.ok(srv.requests.includes("/efu-browser/demo/demo-after.efu"));
+    assert.deepEqual(page.consoleErrors, []);
+  } finally {
+    await page.close();
+    await browser.close();
+    await srv.close();
+  }
+});
+
