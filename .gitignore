@@ -1,1 +1,6 @@
 *.efu
+!tests/fixtures/*.efu
+indexes/
+efu/
+node_modules/
+.env

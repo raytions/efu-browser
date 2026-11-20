@@ -4,15 +4,16 @@ on:
   push:
     branches:
       - master
+      - main
     paths:
       - 'Dockerfile'
       - 'docker-compose.yml'
       - 'docker/**'
       - 'index.html'
+      - 'efu-core.js'
       - 'app.js'
       - 'styles.css'
-      - 'efu/**'
-      - 'docs/**'
+      - 'config.json'
       - '.github/workflows/docker-image.yml'
   release:
     types: [published]

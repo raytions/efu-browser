@@ -1,0 +1,28 @@
+[Unit]
+Description=Scan NAS projects directory and atomically publish EFU snapshot
+After=network-online.target remote-fs.target
+Wants=remote-fs.target
+
+[Service]
+Type=oneshot
+# 使用仅对 NAS 源目录有只读权限、对索引目录有写权限的专用低权限账号
+User=efu-scanner
+Group=efu-scanner
+WorkingDirectory=/opt/efu-browser
+ExecStart=/usr/bin/node /opt/efu-browser/scripts/efu-scan.mjs \
+  --root /mnt/nas/projects \
+  --output /srv/efu-browser/indexes/projects.efu \
+  --exclude .snapshot \
+  --exclude @eaDir \
+  --require-mount /mnt/nas \
+  --export-prefix '\\nas\projects'
+
+# 最小权限沙箱：NAS 源目录仅只读，仅索引输出目录可写
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+PrivateTmp=true
+ReadOnlyPaths=/mnt/nas/projects
+ReadWritePaths=/srv/efu-browser/indexes
+Nice=10
+IOSchedulingClass=idle

@@ -1,10 +1,10 @@
-const PRESET_DIRECTORY = "/efu/";
-const DEFAULT_FILE_NAME = "Software.efu";
-const DEFAULT_FILE = `${PRESET_DIRECTORY}${DEFAULT_FILE_NAME}`;
-const WINDOWS_EPOCH_DIFFERENCE = 116444736000000000n;
-const HUNDRED_NANOSECONDS = 10000n;
+const Core = typeof window !== "undefined" ? window.EfuCore : null;
+
+const RUNTIME_CONFIG_FILE = "config.json";
 const DEFAULT_PAGE_SIZE = 20;
-const DIRECTORY_FLAG = 0x0010;
+const CACHE_STORAGE_KEY = "efu-cached-data-v2";
+const CACHE_MAX_BYTES = 2 * 1024 * 1024;
+const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const COLUMN_CLASSES = {
   FileName: "col-file",
@@ -15,36 +15,11 @@ const COLUMN_CLASSES = {
   Attributes: "col-attributes",
 };
 
-const ATTRIBUTE_FLAGS = [
-  { mask: 0x0001, label: "只读" },
-  { mask: 0x0002, label: "隐藏" },
-  { mask: 0x0004, label: "系统" },
-  { mask: 0x0008, label: "卷标" },
-  { mask: 0x0010, label: "目录" },
-  { mask: 0x0020, label: "存档" },
-  { mask: 0x0040, label: "设备" },
-  { mask: 0x0080, label: "普通" },
-  { mask: 0x0100, label: "临时" },
-  { mask: 0x0200, label: "稀疏文件" },
-  { mask: 0x0400, label: "重解析点" },
-  { mask: 0x0800, label: "压缩" },
-  { mask: 0x1000, label: "脱机" },
-  { mask: 0x4000, label: "加密" },
-  { mask: 0x8000, label: "完整性流" },
-  { mask: 0x10000, label: "虚拟" },
-  { mask: 0x20000, label: "免擦除" },
-  { mask: 0x40000, label: "扩展属性" },
-  { mask: 0x80000, label: "已固定" },
-  { mask: 0x100000, label: "未固定" },
-  { mask: 0x200000, label: "按需打开" },
-  { mask: 0x400000, label: "按需访问" },
-];
-
 const THEME_SEQUENCE = ["light", "dark", "mac"];
 const THEME_META = {
-  light: { icon: "☀️", label: "明亮", className: "theme-light" },
-  dark: { icon: "🌙", label: "暗黑", className: "theme-dark" },
-  mac: { icon: "🍎", label: "macOS 26", className: "theme-mac" },
+  light: { label: "明亮", className: "theme-light" },
+  dark: { label: "暗黑", className: "theme-dark" },
+  mac: { label: "macOS", className: "theme-mac" },
 };
 
 function resolveInitialTheme() {
@@ -53,7 +28,7 @@ function resolveInitialTheme() {
     if (stored && THEME_SEQUENCE.includes(stored)) {
       return stored;
     }
-  } catch (error) {
+  } catch {
     // 忽略存储异常
   }
   if (typeof window !== "undefined" && window.matchMedia) {
@@ -64,26 +39,17 @@ function resolveInitialTheme() {
   return "light";
 }
 
-const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
-const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hourCycle: "h23",
-});
-
 const state = {
   entries: [],
   filtered: [],
   sortKey: "FileName",
   sortAsc: true,
-  manifest: [],
+  serverIndexes: [],
+  defaultServerIndexId: null,
+  selectedServerIndexId: null,
   activeSource: null,
+  activeLoadId: 0,
+  activeAbortController: null,
   regexSearch: false,
   regexError: null,
   pageSize: DEFAULT_PAGE_SIZE,
@@ -109,11 +75,23 @@ const refs = {
   filteredSize: document.getElementById("filtered-size"),
   results: document.getElementById("results"),
   searchInput: document.getElementById("search-input"),
+  searchError: document.getElementById("search-error"),
   clearSearch: document.getElementById("clear-search"),
   loader: document.getElementById("loader"),
+  loaderText: document.getElementById("loader-text"),
+  tableWrapper: document.getElementById("table-wrapper"),
   headers: Array.from(document.querySelectorAll("thead th")),
   activeSource: document.getElementById("active-source"),
+  snapshotModified: document.getElementById("snapshot-modified"),
   footerSource: document.getElementById("footer-source"),
+  serverIndexBar: document.getElementById("server-index-bar"),
+  serverIndexSelect: document.getElementById("server-index-select"),
+  reloadServerIndex: document.getElementById("reload-server-index"),
+  serverIndexStatus: document.getElementById("server-index-status"),
+  serverSourceBlock: document.getElementById("server-source-block"),
+  statusBanner: document.getElementById("status-banner"),
+  statusBannerText: document.getElementById("status-banner-text"),
+  statusBannerDismiss: document.getElementById("status-banner-dismiss"),
   fileSelector: document.getElementById("file-selector"),
   loadSelected: document.getElementById("load-selected"),
   fileUpload: document.getElementById("file-upload"),
@@ -125,6 +103,7 @@ const refs = {
   openSource: document.getElementById("open-source"),
   closeCurrent: document.getElementById("close-current"),
   closeSource: document.getElementById("close-source"),
+  themeQuickToggle: document.getElementById("theme-quick-toggle"),
   openSettings: document.getElementById("open-settings"),
   closeSettings: document.getElementById("close-settings"),
   overlay: document.getElementById("dialog-overlay"),
@@ -143,40 +122,38 @@ const refs = {
   uploadProgress: document.getElementById("upload-progress"),
   uploadProgressBar: document.getElementById("upload-progress-bar"),
   uploadProgressText: document.getElementById("upload-progress-text"),
+  copyToast: document.getElementById("copy-toast"),
 };
+
+let copyToastTimer = null;
 
 async function init() {
   bindEvents();
   initialiseControls();
   applyTheme();
 
-  // 确保 DOM完全加载后再应用列可见性
-  await new Promise(resolve => {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', resolve);
+  await new Promise((resolve) => {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", resolve, { once: true });
     } else {
       resolve();
     }
   });
 
   applyColumnVisibility();
-
-  // 在下一个事件循环中再次确保应用列宽
-  setTimeout(() => {
-    applyColumnVisibility();
-  }, 0);
-
-  // 尝试从缓存加载数据
-  const loadedFromCache = loadCachedData();
-
-  await loadPresetDirectory();
-
-  // 只有在缓存没有加载成功时才尝试自动加载
-  if (!loadedFromCache) {
-    await attemptInitialLoad();
-  }
-
+  render();
   updateSortIndicators();
+
+  await loadRuntimeConfig();
+
+  if (state.serverIndexes.length > 0) {
+    const initialId = state.defaultServerIndexId || state.serverIndexes[0].id;
+    syncServerIndexSelectors(initialId);
+    await loadServerIndex(initialId);
+  } else {
+    // 静态部署 / 无服务器索引配置时：不请求任何 EFU，仅恢复本地缓存或等待手动导入
+    loadCachedData();
+  }
 }
 
 function initialiseControls() {
@@ -184,7 +161,7 @@ function initialiseControls() {
     refs.pageSize.value = String(state.pageSize);
   }
   if (refs.pageJump) {
-    refs.pageJump.value = state.page > 0 ? state.page : 1;
+    refs.pageJump.value = state.page > 0 ? state.page : "";
   }
   if (refs.toggleRegex) {
     refs.toggleRegex.checked = state.regexSearch;
@@ -204,317 +181,254 @@ function initialiseControls() {
   });
 }
 
-async function loadPresetDirectory() {
-  try {
-    const response = await fetch(PRESET_DIRECTORY, { cache: "no-store" });
-    if (!response.ok) {
-      throw new Error(`目录无法访问 (${response.status})`);
-    }
-    const text = await response.text();
-    const files = extractEfuFromDirectoryListing(text, response.url);
-    if (!files.length) return;
-    state.manifest = files;
-    populateManifestOptions(files);
-  } catch (error) {
-    console.info("目录枚举失败，将仅支持手动上传或默认文件", error);
-  }
-}
+async function loadRuntimeConfig() {
+  let rawConfig = null;
+  const baseHref = window.location.href;
 
-async function attemptInitialLoad() {
-  if (state.manifest.length) {
-    const preferred = findPreferredManifestItem();
-    if (preferred) {
-      refs.fileSelector.value = preferred.path;
-      refs.loadSelected.disabled = false;
-      await loadFileFromFetch(preferred.path, preferred.label);
+  if (typeof window !== "undefined" && window.EFU_BROWSER_CONFIG && typeof window.EFU_BROWSER_CONFIG === "object") {
+    rawConfig = window.EFU_BROWSER_CONFIG;
+  } else if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+    try {
+      const configUrl = new URL(RUNTIME_CONFIG_FILE, baseHref).href;
+      const response = await fetch(configUrl, { cache: "no-store" });
+      if (response.status === 404) {
+        return;
+      }
+      if (!response.ok) {
+        showStatusBanner(`无法读取服务器索引配置 (${response.status})，仍可手动导入本地 EFU 文件。`);
+        return;
+      }
+      rawConfig = await response.json();
+    } catch (error) {
+      console.warn("读取运行时配置失败", error);
+      showStatusBanner("服务器索引配置解析失败，仍可手动导入本地 EFU 文件。");
       return;
     }
+  } else {
+    return;
   }
-  try {
-    await loadFileFromFetch(DEFAULT_FILE, DEFAULT_FILE_NAME);
-  } catch (error) {
-    resetData();
-    renderError("未能自动加载数据，请在上方选择或上传 .efu 文件。");
-    setActiveSource("等待加载");
+
+  const normalized = Core.normalizeRuntimeConfig(rawConfig, baseHref);
+  if (normalized.warnings.length > 0) {
+    console.warn("服务器索引配置警告：", normalized.warnings);
   }
+
+  state.serverIndexes = normalized.indexes;
+  state.defaultServerIndexId = normalized.defaultIndex;
+  renderServerIndexControls();
 }
 
-function findPreferredManifestItem() {
-  const exact = state.manifest.find((item) => item.path.toLowerCase().endsWith(DEFAULT_FILE_NAME.toLowerCase()));
-  return exact || state.manifest[0] || null;
-}
+function renderServerIndexControls() {
+  const indexes = state.serverIndexes;
+  const hasIndexes = indexes.length > 0;
 
-function extractEfuFromDirectoryListing(html, baseUrl) {
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-    const anchors = Array.from(doc.querySelectorAll("a[href]"));
-    const items = anchors
-      .map((anchor) => {
-        const href = anchor.getAttribute("href");
-        if (!href || !/\.efu$/i.test(href)) return null;
-        const absolute = new URL(href, baseUrl);
-        const label = anchor.textContent?.trim() || decodeURIComponent(absolute.pathname.split("/").pop() || href);
-        return {
-          label,
-          path: normaliseLocalUrl(absolute),
-        };
-      })
-      .filter(Boolean);
-    const seen = new Set();
-    return items.filter((item) => {
-      if (seen.has(item.path)) return false;
-      seen.add(item.path);
-      return true;
+  if (refs.serverIndexBar) {
+    refs.serverIndexBar.classList.toggle("hidden", !hasIndexes);
+  }
+  if (refs.serverSourceBlock) {
+    refs.serverSourceBlock.classList.toggle("hidden", !hasIndexes);
+  }
+
+  if (refs.serverIndexSelect) {
+    refs.serverIndexSelect.textContent = "";
+    indexes.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = item.name;
+      refs.serverIndexSelect.appendChild(option);
     });
-  } catch (error) {
-    console.warn("目录解析失败", error);
-    return [];
   }
-}
 
-function normaliseLocalUrl(url) {
-  try {
-    const absolute = typeof url === "string" ? new URL(url, window.location.href) : url;
-    if (absolute.origin === window.location.origin) {
-      return decodeURIComponent(absolute.pathname + absolute.search);
+  if (refs.fileSelector) {
+    while (refs.fileSelector.options.length > 1) {
+      refs.fileSelector.remove(1);
     }
-    return absolute.toString();
-  } catch (error) {
-    return url.toString();
+    indexes.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = item.name;
+      refs.fileSelector.appendChild(option);
+    });
+    if (refs.loadSelected) {
+      refs.loadSelected.disabled = !refs.fileSelector.value;
+    }
   }
 }
 
-function populateManifestOptions(files) {
-  if (!refs.fileSelector) return;
-  while (refs.fileSelector.options.length > 1) {
-    refs.fileSelector.remove(1);
+function syncServerIndexSelectors(indexId) {
+  state.selectedServerIndexId = indexId || null;
+  if (refs.serverIndexSelect && indexId) {
+    refs.serverIndexSelect.value = indexId;
   }
-  files.forEach((item) => {
-    const option = document.createElement("option");
-    option.value = item.path;
-    option.textContent = item.label || item.path;
-    refs.fileSelector.appendChild(option);
-  });
-  if (files.length) {
-    refs.loadSelected.disabled = true;
+  if (refs.fileSelector) {
+    refs.fileSelector.value = indexId || "";
+    if (refs.loadSelected) {
+      refs.loadSelected.disabled = !refs.fileSelector.value;
+    }
   }
 }
 
-async function loadFileFromFetch(path, label) {
-  showLoader(true);
+function setServerLoadingStatus(text) {
+  if (!refs.serverIndexStatus) return;
+  if (text) {
+    refs.serverIndexStatus.textContent = text;
+    refs.serverIndexStatus.classList.remove("hidden");
+  } else {
+    refs.serverIndexStatus.textContent = "";
+    refs.serverIndexStatus.classList.add("hidden");
+  }
+}
+
+function showStatusBanner(message) {
+  if (!refs.statusBanner || !refs.statusBannerText) return;
+  refs.statusBannerText.textContent = message;
+  refs.statusBanner.classList.remove("hidden");
+}
+
+function hideStatusBanner() {
+  if (!refs.statusBanner || !refs.statusBannerText) return;
+  refs.statusBannerText.textContent = "";
+  refs.statusBanner.classList.add("hidden");
+}
+
+async function loadServerIndex(indexId, { isReload = false } = {}) {
+  const target = state.serverIndexes.find((item) => item.id === indexId);
+  if (!target) {
+    showStatusBanner("未找到指定的服务器索引配置。");
+    return false;
+  }
+
+  // 竞态保护：每次加载分配递增 ID 并中止前一个在途请求
+  const loadId = ++state.activeLoadId;
+  if (state.activeAbortController) {
+    try {
+      state.activeAbortController.abort();
+    } catch {
+      // 忽略中止异常
+    }
+  }
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  state.activeAbortController = controller;
+
+  syncServerIndexSelectors(target.id);
+  hideStatusBanner();
+  showLoader(true, `${isReload ? "正在重新加载" : "正在加载"}「${target.name}」...`);
+  setServerLoadingStatus(isReload ? "正在刷新快照..." : "正在加载...");
+  if (refs.reloadServerIndex) {
+    refs.reloadServerIndex.disabled = true;
+  }
+
   try {
-    const response = await fetch(path, { cache: "no-store" });
+    const fetchOptions = { cache: "no-store" };
+    if (controller) {
+      fetchOptions.signal = controller.signal;
+    }
+
+    const response = await fetch(target.url, fetchOptions);
+    if (loadId !== state.activeLoadId) {
+      return false;
+    }
+
     if (!response.ok) {
-      throw new Error(`无法加载 ${path} (${response.status})`);
+      throw new Error(`HTTP ${response.status} ${response.statusText || ""}`.trim());
     }
+
     const text = await response.text();
+    if (loadId !== state.activeLoadId) {
+      return false;
+    }
+
+    const lastModifiedHeader = response.headers ? response.headers.get("Last-Modified") : null;
+    const snapshotModified = Core.formatHttpTimestamp(lastModifiedHeader);
+
+    // 解析与提交统一走 ingestContent；若解析抛错则不会覆盖旧状态
     ingestContent(text, {
-      type: "remote",
-      label: label || path,
-      path,
+      type: "server",
+      id: target.id,
+      label: target.name,
+      path: target.displayPath,
+      url: target.url,
+      snapshotModified,
     });
+
     if (refs.uploadName) {
-      refs.uploadName.textContent = "尚未选择文件";
+      refs.uploadName.textContent = "选择本地 .efu 文件进行浏览";
     }
     closePanels();
+    return true;
+  } catch (error) {
+    if (loadId !== state.activeLoadId) {
+      return false;
+    }
+    if (error && error.name === "AbortError") {
+      return false;
+    }
+
+    // 加载或解析失败：保留现有已加载的结果，只显示可读错误提示
+    const detail = error && error.message ? error.message : "网络或解析异常";
+    const keepHint = state.activeSource ? "（已保留当前显示结果）" : "";
+    showStatusBanner(`加载索引「${target.name}」失败：${detail}${keepHint}`);
+
+    // 若当前已有其他服务器索引在展示，保持状态清晰
+    if (state.activeSource && state.activeSource.type === "server" && state.activeSource.id) {
+      syncServerIndexSelectors(state.activeSource.id);
+    }
+    return false;
   } finally {
-    showLoader(false);
+    if (loadId === state.activeLoadId) {
+      state.activeAbortController = null;
+      showLoader(false);
+      setServerLoadingStatus("");
+      if (refs.reloadServerIndex) {
+        refs.reloadServerIndex.disabled = false;
+      }
+    }
   }
 }
 
 function ingestContent(text, sourceMeta) {
-  const rows = parseCsv(text);
-  const entries = rows
-    .slice(1)
-    .filter((row) => row.length >= 5)
-    .map((row) => {
-      const fullPath = row[0];
-      const fileName = extractFileName(fullPath);
-      const sizeRaw = row[1];
-      const modifiedRaw = row[2];
-      const createdRaw = row[3];
-      const attributes = row[4];
+  // 先完整解析并校验，成功后再原子替换应用状态（避免失败时清空旧数据）
+  const parsed = Core.parseEfu(text);
 
-      const sizeBig = safeBigInt(sizeRaw);
-      const modifiedBig = safeBigInt(modifiedRaw);
-      const createdBig = safeBigInt(createdRaw);
-      const attributeNumber = safeNumber(attributes);
-      const isDirectory = typeof attributeNumber === "number" && (attributeNumber & DIRECTORY_FLAG) === DIRECTORY_FLAG;
-
-      const searchRaw = `${fullPath} ${fileName} ${attributes}`;
-
-      return {
-        path: fullPath,
-        fileName,
-        sizeRaw,
-        sizeBig,
-        modifiedRaw,
-        modifiedBig,
-        createdRaw,
-        createdBig,
-        attributes,
-        attributeNumber,
-        isDirectory,
-        searchIndex: searchRaw.toLowerCase(),
-        searchRaw,
-      };
-    });
-
-  state.entries = entries;
-  state.filtered = entries.filter(filterDirectories);
+  state.entries = parsed.entries;
   state.sortKey = "FileName";
   state.sortAsc = true;
   state.activeSource = sourceMeta;
+  state.regexError = null;
+  if (refs.searchInput) {
+    refs.searchInput.value = "";
+  }
+
+  const { filtered } = Core.filterAndSortEntries(state.entries, {
+    query: "",
+    regexSearch: state.regexSearch,
+    caseSensitive: state.caseSensitive,
+    includeDirectories: state.includeDirectories,
+    sortKey: state.sortKey,
+    sortAsc: state.sortAsc,
+  });
+
+  state.filtered = filtered;
   state.page = state.filtered.length ? 1 : 0;
-  refs.searchInput.value = "";
-  applySort();
+
+  hideStatusBanner();
   render();
   updateSortIndicators();
-  saveCachedData(); // 保存到缓存
-  setActiveSource(sourceMeta?.label || "未命名数据源");
-}
+  setActiveSource(sourceMeta);
 
-function extractFileName(path) {
-  if (!path) return "";
-  const parts = path.split(/[/\\]/);
-  return parts[parts.length - 1] || path;
+  // 仅缓存本地手动导入的小型快照；服务器索引每次以实时快照为准
+  if (sourceMeta && sourceMeta.type !== "server") {
+    saveCachedData();
+  }
 }
 
 function resetData() {
   state.entries = [];
   state.filtered = [];
   state.page = 0;
+  state.regexError = null;
   updateMetrics();
   updatePaginationControls(0);
-}
-
-function parseCsv(text) {
-  const rows = [];
-  let current = [];
-  let value = "";
-  let insideQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-
-    if (char === "\"") {
-      if (insideQuotes && text[i + 1] === "\"") {
-        value += "\"";
-        i += 1;
-      } else {
-        insideQuotes = !insideQuotes;
-      }
-      continue;
-    }
-
-    if (!insideQuotes && (char === "\n" || char === "\r")) {
-      if (char === "\r" && text[i + 1] === "\n") {
-        i += 1;
-      }
-      current.push(value);
-      rows.push(current);
-      current = [];
-      value = "";
-      continue;
-    }
-
-    if (!insideQuotes && char === ",") {
-      current.push(value);
-      value = "";
-      continue;
-    }
-
-    value += char;
-  }
-  if (value.length > 0 || current.length) {
-    current.push(value);
-    rows.push(current);
-  }
-  return rows;
-}
-
-function safeBigInt(raw) {
-  try {
-    if (!raw) return null;
-    const trimmed = raw.trim();
-    if (trimmed === "") return null;
-    const big = BigInt(trimmed);
-    return big >= 0n ? big : null;
-  } catch (error) {
-    return null;
-  }
-}
-
-function safeNumber(raw) {
-  if (!raw) return null;
-  const trimmed = String(raw).trim();
-  if (!trimmed) return null;
-  const num = Number(trimmed);
-  return Number.isFinite(num) ? num : null;
-}
-
-function formatSize(entry) {
-  if (!entry.sizeBig) {
-    return entry.sizeRaw || "—";
-  }
-  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-  let value = entry.sizeBig;
-  let unitIndex = 0;
-  const step = 1024n;
-  while (value >= step && unitIndex < units.length - 1) {
-    value = value / step;
-    unitIndex += 1;
-  }
-  const remainder = entry.sizeBig * 1000n / (step ** BigInt(unitIndex));
-  const display = Number(remainder) / 1000;
-  const precision = display >= 100 ? 0 : display >= 10 ? 1 : 2;
-  return `${display.toFixed(precision)} ${units[unitIndex]}`;
-}
-
-function filetimeToDate(rawBigInt) {
-  if (!rawBigInt) return null;
-  const diff = rawBigInt - WINDOWS_EPOCH_DIFFERENCE;
-  if (diff <= 0n) return null;
-  const msBig = diff / HUNDRED_NANOSECONDS;
-  const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
-  if (msBig > maxSafe) return null;
-  const date = new Date(Number(msBig));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function formatFriendlyDate(entry, key) {
-  const raw = key === "Date Modified" ? entry.modifiedBig : entry.createdBig;
-  const date = filetimeToDate(raw);
-  if (!date) {
-    return { date: "—", time: "", title: "" };
-  }
-  const datePart = dateFormatter.format(date);
-  const timePart = timeFormatter.format(date);
-  return {
-    date: datePart,
-    time: timePart,
-    title: `${datePart} ${timePart}`,
-  };
-}
-
-function describeAttributes(raw) {
-  if (!raw) return "";
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
-  const numeric = Number(trimmed);
-  if (!Number.isFinite(numeric)) {
-    return trimmed;
-  }
-  if (numeric === 0) {
-    return "无标记";
-  }
-  const labels = ATTRIBUTE_FLAGS
-    .filter(({ mask }) => (numeric & mask) === mask)
-    .map(({ label }) => label);
-  if (!labels.length) {
-    return trimmed;
-  }
-  return labels.join("，");
 }
 
 function render() {
@@ -530,7 +444,10 @@ function render() {
     }
   }
 
-  const pageItems = totalPages === 0 ? [] : rows.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+  const pageItems =
+    totalPages === 0
+      ? []
+      : rows.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
 
   refs.results.textContent = "";
 
@@ -538,29 +455,47 @@ function render() {
     if (refs.tableWrapper) {
       refs.tableWrapper.classList.add("empty");
     }
-    const hasAnyEntries = state.entries.length > 0;
-    const emptyTitle = hasAnyEntries ? '未找到匹配的结果' : '尚未加载数据';
-    const emptyHint = hasAnyEntries
-      ? '试试调整搜索关键字或重置筛选条件。'
-      : '通过加载 Everything 导出的 <code>.efu</code> 文件，或打开本地文件以开始浏览。';
-    refs.results.innerHTML = `
-      <tr class="empty-row">
-        <td colspan="6">
-          <div class="empty-state">
-            <span class="empty-icon">📂</span>
-            <h3>${emptyTitle}</h3>
-            <p>${emptyHint}</p>
-          </div>
-        </td>
-      </tr>
-    `;
 
-    // 管理空状态CSS类
-    if (!hasAnyEntries) {
-      document.body.classList.add('empty-data-state');
-    } else {
-      document.body.classList.remove('empty-data-state');
+    const hasSource = Boolean(state.activeSource);
+    const hasAnyEntries = state.entries.length > 0;
+
+    let emptyTitle = "尚未加载数据";
+    let emptyHint = "点击此处或上方“数据源”按钮，打开本地 .efu 文件开始浏览。";
+    if (hasAnyEntries) {
+      emptyTitle = "未找到匹配的结果";
+      emptyHint = "试试调整搜索关键字、通配符或关闭大小写敏感。";
+    } else if (hasSource) {
+      emptyTitle = "该快照不包含文件条目";
+      emptyHint = "目标目录当前为空，或所有目录已被排除。";
     }
+
+    const tr = document.createElement("tr");
+    tr.className = "empty-row";
+    const td = document.createElement("td");
+    td.colSpan = 6;
+
+    const box = document.createElement("div");
+    box.className = "empty-state";
+    box.dataset.action = hasSource ? "none" : "open-local";
+
+    const iconSpan = document.createElement("span");
+    iconSpan.className = "empty-icon";
+    iconSpan.setAttribute("aria-hidden", "true");
+    iconSpan.innerHTML =
+      '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>';
+
+    const heading = document.createElement("h3");
+    heading.textContent = emptyTitle;
+
+    const desc = document.createElement("p");
+    desc.textContent = emptyHint;
+
+    box.append(iconSpan, heading, desc);
+    td.appendChild(box);
+    tr.appendChild(td);
+    refs.results.appendChild(tr);
+
+    document.body.classList.toggle("empty-data-state", !hasAnyEntries);
 
     updateMetrics();
     updatePaginationControls(totalPages);
@@ -572,8 +507,7 @@ function render() {
   if (refs.tableWrapper) {
     refs.tableWrapper.classList.remove("empty");
   }
-  // 有数据时移除空状态类
-  document.body.classList.remove('empty-data-state');
+  document.body.classList.remove("empty-data-state");
 
   const chunkSize = Math.min(state.progressive ? 200 : pageItems.length, pageItems.length);
   const processChunk = (start) => {
@@ -597,42 +531,26 @@ function render() {
 
       const sizeTd = document.createElement("td");
       sizeTd.className = `${COLUMN_CLASSES.Size} num-cell`;
-      const formattedSize = formatSize(entry);
-      sizeTd.textContent = entry.isDirectory ? "—" : formattedSize;
-      sizeTd.title = entry.isDirectory ? "" : formattedSize;
+      const formattedSize = Core.formatSize(entry);
+      sizeTd.textContent = formattedSize;
+      sizeTd.title = formattedSize === "—" ? "" : formattedSize;
       sizeTd.dataset.label = "大小";
 
       const modifiedTd = document.createElement("td");
       modifiedTd.className = `date-cell ${COLUMN_CLASSES["Date Modified"]}`;
-      const modified = formatFriendlyDate(entry, "Date Modified");
-      if (modified.date === "—") {
-        modifiedTd.textContent = "—";
-      } else {
-        modifiedTd.innerHTML = `<span>${modified.date}</span><span>${modified.time}</span>`;
-        modifiedTd.title = modified.title;
-      }
-      if (!state.visibleColumns["Date Modified"]) {
-        modifiedTd.classList.add("hidden-column");
-      }
+      const modified = Core.formatFriendlyDate(entry, "Date Modified");
+      renderDateCell(modifiedTd, modified);
       modifiedTd.dataset.label = "修改时间";
 
       const createdTd = document.createElement("td");
       createdTd.className = `date-cell ${COLUMN_CLASSES["Date Created"]}`;
-      const created = formatFriendlyDate(entry, "Date Created");
-      if (created.date === "—") {
-        createdTd.textContent = "—";
-      } else {
-        createdTd.innerHTML = `<span>${created.date}</span><span>${created.time}</span>`;
-        createdTd.title = created.title;
-      }
-      if (!state.visibleColumns["Date Created"]) {
-        createdTd.classList.add("hidden-column");
-      }
+      const created = Core.formatFriendlyDate(entry, "Date Created");
+      renderDateCell(createdTd, created);
       createdTd.dataset.label = "创建时间";
 
       const attrTd = document.createElement("td");
       attrTd.className = `attr-cell ${COLUMN_CLASSES.Attributes}`;
-      attrTd.textContent = describeAttributes(entry.attributes);
+      attrTd.textContent = Core.describeAttributes(entry.attributes);
       attrTd.title = entry.attributes || "";
       attrTd.dataset.label = "属性";
 
@@ -653,10 +571,29 @@ function render() {
   renderSearchFeedback();
 }
 
+function renderDateCell(td, formatted) {
+  td.textContent = "";
+  if (formatted.date === "—") {
+    td.textContent = "—";
+    td.title = "";
+    return;
+  }
+  const dateSpan = document.createElement("span");
+  dateSpan.className = "date-day";
+  dateSpan.textContent = formatted.date;
+
+  const timeSpan = document.createElement("span");
+  timeSpan.className = "date-time";
+  timeSpan.textContent = formatted.time;
+
+  td.append(dateSpan, timeSpan);
+  td.title = formatted.title;
+}
+
 function updateMetrics() {
-  refs.totalCount.textContent = state.entries.length.toLocaleString();
-  refs.filteredCount.textContent = state.filtered.length.toLocaleString();
-  refs.filteredSize.textContent = formatAggregateSize(state.entries);
+  refs.totalCount.textContent = state.activeSource ? state.entries.length.toLocaleString() : "—";
+  refs.filteredCount.textContent = state.activeSource ? state.filtered.length.toLocaleString() : "—";
+  refs.filteredSize.textContent = state.activeSource ? Core.formatAggregateSize(state.filtered) : "—";
 }
 
 function updatePaginationControls(totalPages) {
@@ -678,40 +615,6 @@ function updatePaginationControls(totalPages) {
   }
 }
 
-function formatAggregateSize(list) {
-  let sum = 0n;
-  for (const item of list) {
-    if (item.sizeBig && !item.isDirectory) {
-      sum += item.sizeBig;
-    }
-  }
-  if (sum === 0n) {
-    return "—";
-  }
-  const units = ["B", "KB", "MB", "GB", "TB", "PB"];
-  let value = sum;
-  let unitIndex = 0;
-  const step = 1024n;
-  while (value >= step && unitIndex < units.length - 1) {
-    value = value / step;
-    unitIndex += 1;
-  }
-  const remainder = sum * 1000n / (step ** BigInt(unitIndex));
-  const display = Number(remainder) / 1000;
-  const precision = display >= 100 ? 0 : display >= 10 ? 1 : 2;
-  return `${display.toFixed(precision)} ${units[unitIndex]}`;
-}
-
-function escapeHtml(text) {
-  if (text === null || text === undefined) return "";
-  return String(text)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
 function debounce(fn, delay = 200) {
   let timer = null;
   return (...args) => {
@@ -721,183 +624,37 @@ function debounce(fn, delay = 200) {
 }
 
 function applySearch(term) {
-  const input = term ?? "";
-  const trimmed = input.trim();
-  state.regexError = null;
+  const { filtered, regexError } = Core.filterAndSortEntries(state.entries, {
+    query: term ?? "",
+    regexSearch: state.regexSearch,
+    caseSensitive: state.caseSensitive,
+    includeDirectories: state.includeDirectories,
+    sortKey: state.sortKey,
+    sortAsc: state.sortAsc,
+  });
 
-  if (!trimmed) {
-    state.filtered = state.entries.filter(filterDirectories);
-    state.page = state.filtered.length ? 1 : 0;
-    applySort();
-    render();
-    return;
-  }
-
-  const plan = buildSearchPlan(trimmed, state.regexSearch, state.caseSensitive);
-  if (plan.error) {
-    state.filtered = [];
-    state.regexError = plan.error;
-    state.page = 0;
-    render();
-    return;
-  }
-
-  state.filtered = state.entries.filter((entry) => filterDirectories(entry) && matchTokens(entry, plan.tokens));
+  state.regexError = regexError;
+  state.filtered = filtered;
   state.page = state.filtered.length ? 1 : 0;
-  applySort();
   render();
-}
-
-function filterDirectories(entry) {
-  return state.includeDirectories ? true : !entry.isDirectory;
-}
-
-function buildSearchPlan(query, regexMode, caseSensitive) {
-  try {
-    const rawTokens = tokenizeQuery(query);
-    const tokens = rawTokens
-      .map((token) => interpretToken(token, regexMode, caseSensitive))
-      .filter(Boolean);
-    return { tokens };
-  } catch (error) {
-    return { error: error.message };
-  }
-}
-
-function tokenizeQuery(query) {
-  const tokens = [];
-  let current = "";
-  let quote = null;
-  for (let i = 0; i < query.length; i++) {
-    const char = query[i];
-    if ((char === '"' || char === "'") && (!quote || quote === char)) {
-      if (quote === char) {
-        quote = null;
-      } else if (!quote) {
-        quote = char;
-      }
-      continue;
-    }
-    if (!quote && /\s/.test(char)) {
-      if (current) {
-        tokens.push(current);
-        current = "";
-      }
-      continue;
-    }
-    current += char;
-  }
-  if (current) {
-    tokens.push(current);
-  }
-  return tokens;
-}
-
-function interpretToken(rawToken, regexMode, caseSensitive) {
-  if (!rawToken) return null;
-  let negate = false;
-  let token = rawToken;
-  if (token.startsWith("!")) {
-    negate = true;
-    token = token.slice(1);
-  }
-  if (!token) return null;
-  let field = "all";
-  const lower = token.toLowerCase();
-  if (lower.startsWith("file:")) {
-    field = "file";
-    token = token.slice(5);
-  } else if (lower.startsWith("path:")) {
-    field = "path";
-    token = token.slice(5);
-  }
-  if (!token) return null;
-  const regex = regexMode ? buildEverythingRegex(token, caseSensitive) : buildWildcardRegex(token, caseSensitive);
-  return {
-    negate,
-    field,
-    regex,
-  };
-}
-
-function buildEverythingRegex(pattern, caseSensitive) {
-  try {
-    const flags = caseSensitive ? "" : "i";
-    return new RegExp(pattern, flags);
-  } catch (error) {
-    throw new Error(`正则无效：${error.message}`);
-  }
-}
-
-function buildWildcardRegex(pattern, caseSensitive) {
-  let regexStr = "";
-  for (let i = 0; i < pattern.length; i++) {
-    const char = pattern[i];
-    if (char === "*") {
-      regexStr += ".*";
-    } else if (char === "?") {
-      regexStr += ".";
-    } else {
-      regexStr += escapeRegexChar(char);
-    }
-  }
-  regexStr = `.*${regexStr}.*`;
-  const flags = caseSensitive ? "" : "i";
-  return new RegExp(regexStr, flags);
-}
-
-function escapeRegexChar(char) {
-  return /[.*+?^${}()|[\]\\]/.test(char) ? `\\${char}` : char;
-}
-
-function matchTokens(entry, tokens) {
-  for (const token of tokens) {
-    const target = getTokenTarget(entry, token.field);
-    const matched = token.regex.test(target);
-    if (!token.negate && !matched) {
-      return false;
-    }
-    if (token.negate && matched) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function getTokenTarget(entry, field) {
-  if (field === "file") return entry.fileName || "";
-  if (field === "path") return entry.path || "";
-  return entry.searchRaw;
 }
 
 function applySort(key = state.sortKey) {
   state.sortKey = key;
-  const multiplier = state.sortAsc ? 1 : -1;
-  const collator = new Intl.Collator("zh-CN", { sensitivity: "base", numeric: true });
-  const compare = {
-    FileName: (a, b) => collator.compare(a.fileName, b.fileName),
-    Path: (a, b) => collator.compare(a.path, b.path),
-    Size: (a, b) => compareBigInt(a.sizeBig, b.sizeBig),
-    "Date Modified": (a, b) => compareBigInt(a.modifiedBig, b.modifiedBig),
-    "Date Created": (a, b) => compareBigInt(a.createdBig, b.createdBig),
-    Attributes: (a, b) => collator.compare(describeAttributes(a.attributes), describeAttributes(b.attributes)),
-  }[key];
-
-  if (!compare) return;
-  state.filtered.sort((a, b) => compare(a, b) * multiplier);
-}
-
-function compareBigInt(a, b) {
-  if (a === b) return 0;
-  if (a === null || a === undefined) return -1;
-  if (b === null || b === undefined) return 1;
-  if (a > b) return 1;
-  if (a < b) return -1;
-  return 0;
+  const { filtered } = Core.filterAndSortEntries(state.entries, {
+    query: refs.searchInput ? refs.searchInput.value : "",
+    regexSearch: state.regexSearch,
+    caseSensitive: state.caseSensitive,
+    includeDirectories: state.includeDirectories,
+    sortKey: state.sortKey,
+    sortAsc: state.sortAsc,
+  });
+  state.filtered = filtered;
 }
 
 function handleSortClick(event) {
-  const key = event.target.dataset.sort;
+  const header = event.target.closest("th[data-sort]");
+  const key = header ? header.dataset.sort : null;
   if (!key) return;
   if (state.sortKey === key) {
     state.sortAsc = !state.sortAsc;
@@ -915,146 +672,166 @@ function updateSortIndicators() {
     const key = header.dataset.sort;
     if (!key) return;
     header.dataset.direction = "";
-    header.style.color = "inherit";
+    header.style.color = "";
     if (key === state.sortKey) {
       header.dataset.direction = state.sortAsc ? "asc" : "desc";
-      header.style.color = "var(--accent)";
+      header.style.color = "var(--text-primary)";
     }
   });
 }
 
-function showLoader(visible) {
+function showLoader(visible, text) {
+  if (!refs.loader) return;
+  if (refs.loaderText && text) {
+    refs.loaderText.textContent = text;
+  }
   refs.loader.classList.toggle("hidden", !visible);
 }
 
-function renderError(message) {
-  if (refs.tableWrapper) {
-    refs.tableWrapper.classList.add("empty");
-  }
-  if (message.includes("未能自动加载数据")) {
-    refs.results.innerHTML = `
-      <tr class="empty-row">
-        <td colspan="6">
-          <div class="empty-state">
-            <span class="empty-icon">📁</span>
-            <h3>尚未加载数据</h3>
-            <p>使用上方的 “＋” 按钮或 📂 “本地打开” 来选择 Everything 导出的 <code>.efu</code> 文件。</p>
-          </div>
-        </td>
-      </tr>
-    `;
-  } else {
-    refs.results.innerHTML = `<tr><td colspan="6">${escapeHtml(message)}</td></tr>`;
-  }
-  updateMetrics();
-  updatePaginationControls(0);
-  renderSearchFeedback();
-  applyColumnVisibility();
-}
-
-async function copyPath(path) {
+async function copyPath(pathText) {
   try {
-    await navigator.clipboard.writeText(path);
+    await navigator.clipboard.writeText(pathText);
+    showCopyToast(`已复制路径：${pathText}`);
   } catch (err) {
     console.warn("复制失败", err);
+    showCopyToast("复制失败，请检查剪贴板权限");
   }
 }
 
-function setActiveSource(label) {
+function showCopyToast(message) {
+  if (!refs.copyToast) return;
+  refs.copyToast.textContent = message;
+  refs.copyToast.classList.remove("hidden");
+  clearTimeout(copyToastTimer);
+  copyToastTimer = setTimeout(() => {
+    refs.copyToast.classList.add("hidden");
+  }, 2000);
+}
+
+function setActiveSource(sourceMeta) {
+  const label = typeof sourceMeta === "string" ? sourceMeta : sourceMeta?.label;
   const text = label || "尚未加载";
-  refs.activeSource.textContent = text;
+
+  if (refs.activeSource) {
+    refs.activeSource.textContent = text;
+  }
   if (refs.footerSource) {
-    refs.footerSource.textContent = text;
+    refs.footerSource.textContent = label || "—";
   }
 
-  // 根据是否加载文件来切换按钮显示
-  const hasFile = label && label !== "等待加载" && label !== "—" && label !== "尚未加载";
-
-  if (refs.openSource) {
-    refs.openSource.style.display = hasFile ? 'none' : 'inline-block';
+  if (refs.snapshotModified) {
+    const snapshotTime = typeof sourceMeta === "object" ? sourceMeta?.snapshotModified : null;
+    if (snapshotTime) {
+      refs.snapshotModified.textContent = `快照修改时间：${snapshotTime}`;
+      refs.snapshotModified.title = "来自服务器 HTTP Last-Modified 响应头";
+      refs.snapshotModified.classList.remove("hidden");
+    } else {
+      refs.snapshotModified.textContent = "";
+      refs.snapshotModified.classList.add("hidden");
+    }
   }
 
+  const hasFile = Boolean(label && label !== "等待加载" && label !== "—" && label !== "尚未加载");
   if (refs.closeCurrent) {
-    refs.closeCurrent.style.display = hasFile ? 'inline-block' : 'none';
+    refs.closeCurrent.style.display = hasFile ? "inline-flex" : "none";
   }
 }
 
-// 从本地存储加载缓存数据
+function serializeEntryForCache(entry) {
+  return {
+    path: entry.path,
+    fileName: entry.fileName,
+    sizeRaw: entry.sizeRaw,
+    sizeBig: entry.sizeBig !== null && entry.sizeBig !== undefined ? entry.sizeBig.toString() : null,
+    modifiedRaw: entry.modifiedRaw,
+    modifiedBig: entry.modifiedBig !== null && entry.modifiedBig !== undefined ? entry.modifiedBig.toString() : null,
+    createdRaw: entry.createdRaw,
+    createdBig: entry.createdBig !== null && entry.createdBig !== undefined ? entry.createdBig.toString() : null,
+    attributes: entry.attributes,
+    attributeNumber: entry.attributeNumber,
+    isDirectory: entry.isDirectory,
+    searchIndex: entry.searchIndex,
+    searchRaw: entry.searchRaw,
+  };
+}
+
+function deserializeEntryFromCache(item) {
+  return {
+    ...item,
+    sizeBig: item.sizeBig !== null && item.sizeBig !== undefined ? BigInt(item.sizeBig) : null,
+    modifiedBig: item.modifiedBig !== null && item.modifiedBig !== undefined ? BigInt(item.modifiedBig) : null,
+    createdBig: item.createdBig !== null && item.createdBig !== undefined ? BigInt(item.createdBig) : null,
+  };
+}
+
 function loadCachedData() {
   try {
-    const cached = localStorage.getItem('efu-cached-data');
-    if (cached) {
-      const data = JSON.parse(cached);
-      if (data.entries && data.activeSource && data.timestamp) {
-        // 检查缓存是否过期（24小时）
-        const now = Date.now();
-        const cacheAge = now - data.timestamp;
-        const maxAge = 24 * 60 * 60 * 1000; // 24小时
-
-        if (cacheAge < maxAge) {
-          state.entries = data.entries;
-          state.filtered = data.entries.filter(filterDirectories);
-          state.activeSource = data.activeSource;
-          setActiveSource(data.activeSource.name || data.activeSource.path);
-          applySearch(""); // 重新应用搜索和排序
-          console.log('已从缓存恢复数据:', data.activeSource.name);
-          return true;
-        } else {
-          // 缓存过期，清理
-          localStorage.removeItem('efu-cached-data');
-        }
-      }
+    const cached = localStorage.getItem(CACHE_STORAGE_KEY);
+    if (!cached) return false;
+    const data = JSON.parse(cached);
+    if (!Array.isArray(data.entries) || !data.activeSource || !data.timestamp) {
+      localStorage.removeItem(CACHE_STORAGE_KEY);
+      return false;
     }
+    if (Date.now() - data.timestamp >= CACHE_MAX_AGE_MS) {
+      localStorage.removeItem(CACHE_STORAGE_KEY);
+      return false;
+    }
+
+    state.entries = data.entries.map(deserializeEntryFromCache);
+    state.activeSource = data.activeSource;
+    setActiveSource(data.activeSource);
+    applySearch("");
+    return true;
   } catch (error) {
-    console.warn('无法加载缓存数据:', error);
-    localStorage.removeItem('efu-cached-data');
-  }
-  return false;
-}
-
-// 保存数据到本地存储
-function saveCachedData() {
-  if (state.entries.length > 0 && state.activeSource) {
+    console.warn("无法加载缓存数据:", error);
     try {
-      const data = {
-        entries: state.entries,
-        activeSource: state.activeSource,
-        timestamp: Date.now()
-      };
-      localStorage.setItem('efu-cached-data', JSON.stringify(data));
-      console.log('数据已缓存:', state.activeSource.name || state.activeSource.path);
-    } catch (error) {
-      console.warn('无法缓存数据:', error);
+      localStorage.removeItem(CACHE_STORAGE_KEY);
+    } catch {
+      // 忽略清理异常
     }
+    return false;
   }
 }
 
-// 关闭当前文件
-function closeCurrentFile() {
-  if (state.activeSource) {
-    // 获取当前文件名用于清理记录
-    const currentFileName = state.activeSource.label || state.activeSource.path || state.activeSource.name;
-
-    // 清理当前数据
-    resetData();
-
-    // 清理缓存
-    localStorage.removeItem('efu-cached-data');
-
-    // 清理本地上传记录，避免重新上传时出现覆盖提示
-    if (currentFileName && state.localUploads[currentFileName]) {
-      delete state.localUploads[currentFileName];
+function saveCachedData() {
+  if (!state.activeSource) return;
+  try {
+    const payload = JSON.stringify({
+      entries: state.entries.map(serializeEntryForCache),
+      activeSource: state.activeSource,
+      timestamp: Date.now(),
+    });
+    if (payload.length > CACHE_MAX_BYTES) {
+      localStorage.removeItem(CACHE_STORAGE_KEY);
+      return;
     }
-
-    // 重置状态到初始状态
-    state.activeSource = null;
-    setActiveSource('');
-
-    // 清空表格内容，显示初始空状态
-    render();
-
-    console.log('已关闭文件并清理缓存和上传记录');
+    localStorage.setItem(CACHE_STORAGE_KEY, payload);
+  } catch (error) {
+    console.warn("无法缓存数据:", error);
   }
+}
+
+function closeCurrentFile() {
+  if (!state.activeSource) return;
+
+  const currentFileName = state.activeSource.label || state.activeSource.path;
+  resetData();
+
+  try {
+    localStorage.removeItem(CACHE_STORAGE_KEY);
+  } catch {
+    // 忽略清理异常
+  }
+
+  if (currentFileName && state.localUploads[currentFileName]) {
+    delete state.localUploads[currentFileName];
+  }
+
+  state.activeSource = null;
+  setActiveSource(null);
+  hideStatusBanner();
+  render();
 }
 
 function renderSearchFeedback() {
@@ -1077,25 +854,26 @@ function applyTheme() {
   }
   try {
     localStorage.setItem("efu-theme", state.theme);
-  } catch (error) {
+  } catch {
     // 忽略存储失败
   }
   updateThemeOptions();
 }
 
 function updateThemeOptions() {
-  if (!refs.themeOptions) return;
   const meta = THEME_META[state.theme] || THEME_META.light;
-  refs.themeOptions.forEach((button) => {
-    const target = button.dataset.themeOption;
-    const active = target === state.theme;
-    button.classList.toggle("active", active);
-    if (active) {
-      button.setAttribute("aria-pressed", "true");
-    } else {
-      button.setAttribute("aria-pressed", "false");
-    }
-  });
+  if (refs.themeOptions) {
+    refs.themeOptions.forEach((button) => {
+      const target = button.dataset.themeOption;
+      const active = target === state.theme;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+  }
+  if (refs.themeQuickToggle) {
+    refs.themeQuickToggle.title = `切换主题（当前：${meta.label}）`;
+    refs.themeQuickToggle.setAttribute("aria-label", `切换主题（当前：${meta.label}）`);
+  }
   if (refs.openSettings) {
     refs.openSettings.setAttribute("aria-label", `打开设置（当前主题：${meta.label}）`);
   }
@@ -1103,17 +881,14 @@ function updateThemeOptions() {
 
 function cycleTheme() {
   const currentIndex = THEME_SEQUENCE.indexOf(state.theme);
-  const nextTheme = THEME_SEQUENCE[(currentIndex + 1) % THEME_SEQUENCE.length];
-  state.theme = nextTheme;
+  state.theme = THEME_SEQUENCE[(currentIndex + 1) % THEME_SEQUENCE.length];
   applyTheme();
 }
 
 function showUploadProgress(label) {
   if (!refs.uploadProgress) return;
   refs.uploadProgress.classList.remove("hidden");
-  if (refs.uploadProgress.setAttribute) {
-    refs.uploadProgress.setAttribute("aria-label", `正在加载 ${label}`);
-  }
+  refs.uploadProgress.setAttribute("aria-label", `正在加载 ${label}`);
   updateUploadProgress(0);
 }
 
@@ -1180,13 +955,20 @@ function toggleColumnPopover() {
 function readLocalFile(file, { rememberSource = false } = {}) {
   if (!file) return;
   const label = file.name || "本地文件";
-  const lower = label.toLowerCase();
-  if (!lower.endsWith(".efu")) {
-    renderError("只允许加载 .efu 文件");
+  if (!label.toLowerCase().endsWith(".efu")) {
+    showStatusBanner("只允许加载 .efu 文件");
     return;
   }
-  if (rememberSource && state.localUploads[label] && !window.confirm(`文件 \"${label}\" 已加载，是否覆盖？`)) {
-    return;
+
+  // 取消任何正在进行的服务器索引请求，避免迟到请求覆盖本地文件
+  state.activeLoadId += 1;
+  if (state.activeAbortController) {
+    try {
+      state.activeAbortController.abort();
+    } catch {
+      // ignore
+    }
+    state.activeAbortController = null;
   }
 
   showUploadProgress(label);
@@ -1200,15 +982,16 @@ function readLocalFile(file, { rememberSource = false } = {}) {
   };
   reader.onerror = () => {
     hideUploadProgress();
-    renderError("读取本地文件失败");
+    showStatusBanner(`读取本地文件「${label}」失败`);
   };
   reader.onload = () => {
     hideUploadProgress();
     try {
-      ingestContent(reader.result, {
+      ingestContent(String(reader.result || ""), {
         type: rememberSource ? "upload" : "local",
         label,
         path: label,
+        snapshotModified: null,
       });
       if (rememberSource && refs.uploadName) {
         refs.uploadName.textContent = label;
@@ -1218,10 +1001,11 @@ function readLocalFile(file, { rememberSource = false } = {}) {
         closePanels();
       }
     } catch (error) {
-      renderError("上传的文件解析失败");
+      const keepHint = state.activeSource ? "（已保留当前显示结果）" : "";
+      showStatusBanner(`解析本地文件「${label}」失败：${error.message}${keepHint}`);
     }
   };
-  reader.readAsText(file);
+  reader.readAsText(file, "utf-8");
 }
 
 function applyColumnVisibility() {
@@ -1232,112 +1016,103 @@ function applyColumnVisibility() {
     });
   });
 
-  // 动态调整表格列宽类
   const table = document.querySelector("table");
-  if (table) {
-    // 清除所有动态列宽类
-    table.classList.remove(
-      "table-columns-all",
-      "table-columns-no-created",
-      "table-columns-no-attributes",
-      "table-columns-no-size",
-      "table-columns-no-created-attributes",
-      "table-columns-core",
-      "table-columns-minimal"
-    );
+  if (!table) return;
 
-    // 获取当前显示的列
-    const visibleColumns = Object.entries(state.visibleColumns)
-      .filter(([key, visible]) => visible)
-      .map(([key]) => key);
+  table.classList.remove(
+    "table-columns-all",
+    "table-columns-no-created",
+    "table-columns-no-attributes",
+    "table-columns-no-size",
+    "table-columns-no-created-attributes",
+    "table-columns-core",
+    "table-columns-minimal"
+  );
 
-    // 根据显示的列组合设置相应的CSS类
-    const hasFile = visibleColumns.includes("FileName");
-    const hasPath = visibleColumns.includes("Path");
-    const hasSize = visibleColumns.includes("Size");
-    const hasModified = visibleColumns.includes("Date Modified");
-    const hasCreated = visibleColumns.includes("Date Created");
-    const hasAttributes = visibleColumns.includes("Attributes");
+  const visibleColumns = Object.entries(state.visibleColumns)
+    .filter(([, visible]) => visible)
+    .map(([key]) => key);
 
-    // 计算显示的列数和组合
-    const columnCount = visibleColumns.length;
+  const hasFile = visibleColumns.includes("FileName");
+  const hasPath = visibleColumns.includes("Path");
+  const hasSize = visibleColumns.includes("Size");
+  const hasModified = visibleColumns.includes("Date Modified");
+  const hasCreated = visibleColumns.includes("Date Created");
+  const hasAttributes = visibleColumns.includes("Attributes");
+  const columnCount = visibleColumns.length;
 
-    if (columnCount === 6) {
-      // 所有列都显示
-      table.classList.add("table-columns-all");
-    } else if (columnCount === 5) {
-      // 5列显示的不同组合
-      if (!hasCreated) {
-        table.classList.add("table-columns-no-created");
-      } else if (!hasAttributes) {
-        table.classList.add("table-columns-no-attributes");
-      } else if (!hasSize) {
-        table.classList.add("table-columns-no-size");
-      } else {
-        table.classList.add("table-columns-all"); // 默认布局
-      }
-    } else if (columnCount === 4) {
-      // 4列显示
-      if (!hasCreated && !hasAttributes) {
-        table.classList.add("table-columns-no-created-attributes");
-      } else {
-        table.classList.add("table-columns-all"); // 默认布局
-      }
-    } else if (columnCount === 3) {
-      // 3列显示 - 核心列 (文件名、路径、修改时间)
-      if (hasFile && hasPath && hasModified) {
-        table.classList.add("table-columns-core");
-      } else {
-        table.classList.add("table-columns-all"); // 默认布局
-      }
-    } else if (columnCount === 2) {
-      // 2列显示 - 最简列 (文件名、路径)
-      if (hasFile && hasPath) {
-        table.classList.add("table-columns-minimal");
-      } else {
-        table.classList.add("table-columns-all"); // 默认布局
-      }
-    } else {
-      // 其他情况使用默认布局
-      table.classList.add("table-columns-all");
-    }
+  if (columnCount === 6) {
+    table.classList.add("table-columns-all");
+  } else if (columnCount === 5) {
+    if (!hasCreated) table.classList.add("table-columns-no-created");
+    else if (!hasAttributes) table.classList.add("table-columns-no-attributes");
+    else if (!hasSize) table.classList.add("table-columns-no-size");
+    else table.classList.add("table-columns-all");
+  } else if (columnCount === 4 && !hasCreated && !hasAttributes) {
+    table.classList.add("table-columns-no-created-attributes");
+  } else if (columnCount === 3 && hasFile && hasPath && hasModified) {
+    table.classList.add("table-columns-core");
+  } else if (columnCount === 2 && hasFile && hasPath) {
+    table.classList.add("table-columns-minimal");
+  } else {
+    table.classList.add("table-columns-all");
   }
 }
 
 const debouncedSearch = debounce((event) => {
   applySearch(event.target.value || "");
-}, 250);
+}, 180);
 
 function bindEvents() {
-  refs.searchInput.addEventListener("input", debouncedSearch);
+  if (refs.searchInput) {
+    refs.searchInput.addEventListener("input", debouncedSearch);
+  }
   if (refs.clearSearch) {
     refs.clearSearch.addEventListener("click", () => {
-      refs.searchInput.value = "";
+      if (refs.searchInput) refs.searchInput.value = "";
       applySearch("");
     });
   }
   refs.headers.forEach((header) => header.addEventListener("click", handleSortClick));
+
+  if (refs.serverIndexSelect) {
+    refs.serverIndexSelect.addEventListener("change", (event) => {
+      const targetId = event.target.value;
+      if (targetId) {
+        loadServerIndex(targetId);
+      }
+    });
+  }
+  if (refs.reloadServerIndex) {
+    refs.reloadServerIndex.addEventListener("click", () => {
+      const targetId =
+        refs.serverIndexSelect?.value ||
+        state.selectedServerIndexId ||
+        state.defaultServerIndexId;
+      if (targetId) {
+        loadServerIndex(targetId, { isReload: true });
+      }
+    });
+  }
+  if (refs.statusBannerDismiss) {
+    refs.statusBannerDismiss.addEventListener("click", hideStatusBanner);
+  }
+
   if (refs.fileSelector) {
     refs.fileSelector.addEventListener("change", (event) => {
-      const hasValue = Boolean(event.target.value);
       if (refs.loadSelected) {
-        refs.loadSelected.disabled = !hasValue;
+        refs.loadSelected.disabled = !event.target.value;
       }
     });
   }
   if (refs.loadSelected) {
     refs.loadSelected.addEventListener("click", async () => {
-      const option = refs.fileSelector?.selectedOptions[0];
-      if (!option || !option.value) return;
-      try {
-        await loadFileFromFetch(option.value, option.textContent.trim());
-        setActiveSource(option.textContent.trim());
-      } catch (error) {
-        resetData();
-        renderError(error.message);
-      }
+      const targetId = refs.fileSelector?.value;
+      if (!targetId) return;
+      await loadServerIndex(targetId);
     });
   }
+
   if (refs.uploadTrigger) {
     refs.uploadTrigger.addEventListener("click", () => {
       refs.fileUpload?.click();
@@ -1356,6 +1131,9 @@ function bindEvents() {
   }
   if (refs.closeSource) {
     refs.closeSource.addEventListener("click", closePanels);
+  }
+  if (refs.themeQuickToggle) {
+    refs.themeQuickToggle.addEventListener("click", cycleTheme);
   }
   if (refs.openSettings) {
     refs.openSettings.addEventListener("click", () => {
@@ -1377,19 +1155,19 @@ function bindEvents() {
   if (refs.toggleRegex) {
     refs.toggleRegex.addEventListener("change", (event) => {
       state.regexSearch = event.target.checked;
-      applySearch(refs.searchInput.value || "");
+      applySearch(refs.searchInput ? refs.searchInput.value : "");
     });
   }
   if (refs.toggleIncludeDirs) {
     refs.toggleIncludeDirs.addEventListener("change", (event) => {
       state.includeDirectories = event.target.checked;
-      applySearch(refs.searchInput.value || "");
+      applySearch(refs.searchInput ? refs.searchInput.value : "");
     });
   }
   if (refs.toggleCaseSensitive) {
     refs.toggleCaseSensitive.addEventListener("change", (event) => {
       state.caseSensitive = event.target.checked;
-      applySearch(refs.searchInput.value || "");
+      applySearch(refs.searchInput ? refs.searchInput.value : "");
     });
   }
   if (refs.columnSettingsToggle) {
@@ -1418,13 +1196,13 @@ function bindEvents() {
     }
   });
 
-  // 空状态点击事件代理
   document.addEventListener("click", (event) => {
-    const emptyState = event.target.closest('.empty-state');
-    if (emptyState && refs.results.contains(emptyState)) {
-      document.getElementById('upload-trigger').click();
+    const emptyState = event.target.closest(".empty-state");
+    if (emptyState && emptyState.dataset.action === "open-local" && refs.results.contains(emptyState)) {
+      refs.fileUpload?.click();
     }
   });
+
   if (refs.pageSize) {
     refs.pageSize.addEventListener("change", (event) => {
       const value = Number(event.target.value);
@@ -1466,8 +1244,7 @@ function bindEvents() {
         event.target.value = state.page;
         return;
       }
-      const target = Math.min(Math.floor(value), totalPages);
-      state.page = target;
+      state.page = Math.min(Math.floor(value), totalPages);
       render();
     });
   }
@@ -1481,102 +1258,27 @@ function bindEvents() {
     })
   );
 }
+
 function handleFileUpload(event) {
   const [file] = event.target.files || [];
   event.target.value = "";
   if (!file) return;
 
-  refs.fileSelector.value = "";
-  if (refs.loadSelected) {
-    refs.loadSelected.disabled = true;
-  }
-
-  // 检查文件类型
-  if (!file.name.toLowerCase().endsWith('.efu')) {
-    renderError("只允许打开 .efu 文件");
+  if (!file.name.toLowerCase().endsWith(".efu")) {
+    showStatusBanner("只允许打开 .efu 文件");
     return;
   }
 
-  // 使用前端文件处理
   readLocalFile(file, { rememberSource: true });
 }
 
-init();
-
-// 浮动滚动条控制
-function initFloatingScrollbar() {
-  // 移除之前的事件监听器，避免重复绑定
-  const existingScrollbar = document.querySelector('.table-scroll');
-  if (existingScrollbar) {
-    existingScrollbar.removeEventListener('scroll', handleScrollEvent);
-    existingScrollbar.removeEventListener('mouseenter', handleMouseEnter);
-    existingScrollbar.removeEventListener('mouseleave', handleMouseLeave);
-  }
-
-  const tableScroll = document.querySelector('.table-scroll');
-  if (!tableScroll) return;
-
-  let scrollTimer;
-
-  // 滚动事件处理函数
-  function handleScrollEvent() {
-    tableScroll.classList.add('scrolling');
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(() => {
-      tableScroll.classList.remove('scrolling');
-    }, 800);
-  }
-
-  // 鼠标进入事件处理函数
-  function handleMouseEnter() {
-    tableScroll.classList.add('scrolling');
-    clearTimeout(scrollTimer);
-  }
-
-  // 鼠标离开事件处理函数
-  function handleMouseLeave() {
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(() => {
-      tableScroll.classList.remove('scrolling');
-    }, 300);
-  }
-
-  // 添加事件监听器
-  tableScroll.addEventListener('scroll', handleScrollEvent);
-  tableScroll.addEventListener('mouseenter', handleMouseEnter);
-  tableScroll.addEventListener('mouseleave', handleMouseLeave);
-
-  // 将事件处理函数绑定到元素上，便于后续移除
-  tableScroll.handleScrollEvent = handleScrollEvent;
-  tableScroll.handleMouseEnter = handleMouseEnter;
-  tableScroll.handleMouseLeave = handleMouseLeave;
+if (typeof window !== "undefined") {
+  window.__efuApp = {
+    state,
+    loadServerIndex,
+    ingestContent,
+    applySearch,
+    loadRuntimeConfig,
+  };
+  init();
 }
-
-// 在DOM内容变化后重新初始化滚动条
-function reinitScrollbar() {
-  // 延迟执行，确保DOM已更新
-  setTimeout(initFloatingScrollbar, 100);
-}
-
-// 初始化浮动滚动条
-document.addEventListener('DOMContentLoaded', initFloatingScrollbar);
-
-// 监听表格内容更新，重新初始化滚动条
-const tableWrapper = document.querySelector('#table-wrapper');
-if (tableWrapper) {
-  const observer = new MutationObserver((mutations) => {
-    mutations.forEach((mutation) => {
-      if (mutation.type === 'childList' && mutation.target.closest('.table-scroll')) {
-        reinitScrollbar();
-      }
-    });
-  });
-
-  observer.observe(tableWrapper, {
-    childList: true,
-    subtree: true
-  });
-}
-
-// 初始化
-initFloatingScrollbar();

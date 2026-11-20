@@ -4,12 +4,14 @@ on:
   push:
     branches:
       - master
+      - main
     paths:
       - 'index.html'
+      - 'efu-core.js'
       - 'app.js'
       - 'styles.css'
+      - 'config.json'
       - 'docs/**'
-      - 'efu/**'
       - '.github/workflows/static.yml'
   workflow_dispatch:
 
@@ -36,15 +38,13 @@ jobs:
         run: |
           mkdir -p public
           cp index.html public/
+          cp efu-core.js public/
           cp app.js public/
           cp styles.css public/
+          cp config.json public/
           if [ -d docs ]; then
             mkdir -p public/docs
             rsync -av --delete docs/ public/docs/
-          fi
-          if [ -d efu ]; then
-            mkdir -p public/efu
-            rsync -av --delete efu/ public/efu/
           fi
 
       - name: Upload artifact

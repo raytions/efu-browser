@@ -2,9 +2,16 @@
 .git
 .gitignore
 
-# Ignore efu files and directory (they will be mounted at runtime)
+# Ignore generated efu files and directories (mounted read-only at runtime)
 *.efu
 efu/
+indexes/
+
+# Ignore CLI, tests, and deployment templates not needed in nginx static image
+scripts/
+tests/
+deploy/
+docs/
 
 # Node / Python / misc artifacts
 node_modules
@@ -20,10 +27,7 @@ __pycache__
 .idea
 .vscode
 
-# Build and docs cache
+# Build and cache
 coverage
 .tmp
 .cache
-
-# Screenshots source files (keep exported PNGs/JPGs if needed)
-docs/screenshots/source

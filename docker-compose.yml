@@ -1,16 +1,14 @@
-version: "2.2"
 services:
   efu-browser:
-    image: ghcr.io/raytions/efu-browser:sha-831588b
+    build: .
+    image: ghcr.io/raytions/efu-browser:latest
     ports:
       - "8088:80"
     volumes:
-      # 将本地 efu 文件夹映射到容器内的目录
-      - ./efu:/app/efu
+      # 仅向 Web 容器只读挂载生成的 EFU 索引目录，不要挂载原始 NAS 目录
+      - ./indexes:/app/indexes:ro
+      # 可选：挂载自定义运行时配置（取消注释即可启用服务器索引，无需重新打包镜像）
+      # - ./config.json:/usr/share/nginx/html/config.json:ro
     restart: unless-stopped
-    network_mode: bridge
     environment:
       - TZ=Asia/Shanghai
-      - PUID=1000
-      - PGID=1000
-      - UMASK=022

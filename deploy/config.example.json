@@ -1,0 +1,10 @@
+{
+  "defaultIndex": "projects",
+  "indexes": [
+    {
+      "id": "projects",
+      "name": "NAS 项目目录",
+      "url": "indexes/projects.efu"
+    }
+  ]
+}

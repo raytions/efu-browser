@@ -1,0 +1,17 @@
+{
+  "name": "efu-browser",
+  "version": "1.1.0",
+  "description": "Everything EFU static web browser and Linux/NAS scanner-to-EFU adapter CLI",
+  "private": true,
+  "bin": {
+    "efu-scan": "./scripts/efu-scan.mjs"
+  },
+  "scripts": {
+    "scan": "node scripts/efu-scan.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "lint": "node --check efu-core.js && node --check app.js && node --check scripts/efu-scan-lib.mjs && node --check scripts/efu-scan.mjs"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

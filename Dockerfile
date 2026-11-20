@@ -4,11 +4,9 @@ FROM nginx:1.27-alpine
 # Copy custom nginx configuration
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy static assets
-COPY . /usr/share/nginx/html
-
-# Reduce image size by removing default html files bundled with nginx
-RUN rm -rf /usr/share/nginx/html/html
+# Clean default nginx html files and copy only static web assets
+RUN rm -rf /usr/share/nginx/html/*
+COPY index.html styles.css efu-core.js app.js config.json /usr/share/nginx/html/
 
 EXPOSE 80
 

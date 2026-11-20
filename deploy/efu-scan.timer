@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic NAS EFU snapshot scan timer
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+RandomizedDelaySec=5m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
