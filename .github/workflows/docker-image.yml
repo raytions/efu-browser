@@ -8,10 +8,12 @@ on:
     paths:
       - 'Dockerfile'
       - 'docker-compose.yml'
+      - 'docker-compose.env.yml'
       - 'docker/**'
       - 'index.html'
       - 'efu-core.js'
       - 'scans-demo-service.js'
+      - 'scans-real-service.js'
       - 'scans-view.js'
       - 'app.js'
       - 'styles.css'

@@ -635,7 +635,38 @@
       defaultIndex = indexes[0].id;
     }
 
-    return { defaultIndex, indexes, warnings };
+    let scansMode = "demo";
+    let scansApiBase = null;
+    const rawScans = rawConfig.scans && typeof rawConfig.scans === "object" ? rawConfig.scans : null;
+    if (rawScans) {
+      const modeStr = typeof rawScans.mode === "string" ? rawScans.mode.trim().toLowerCase() : "demo";
+      if (modeStr === "real") {
+        scansMode = "real";
+        const rawApiBase =
+          typeof rawScans.apiBase === "string" && rawScans.apiBase.trim()
+            ? rawScans.apiBase.trim()
+            : "/api/scans";
+        const resolvedApi = resolveSameOriginUrl(rawApiBase, baseHref);
+        if (resolvedApi.ok) {
+          scansApiBase = resolvedApi.url.replace(/\/+$/, "");
+        } else {
+          warnings.push(`已忽略无效的 scans.apiBase：${resolvedApi.error}`);
+          scansApiBase = resolveSameOriginUrl("/api/scans", baseHref).url?.replace(/\/+$/, "") || null;
+        }
+      } else if (modeStr !== "demo" && modeStr !== "") {
+        warnings.push(`未知的 scans.mode="${modeStr}"，已回退为 demo`);
+      }
+    }
+
+    return {
+      defaultIndex,
+      indexes,
+      scans: {
+        mode: scansMode,
+        apiBase: scansApiBase,
+      },
+      warnings,
+    };
   }
 
   return {

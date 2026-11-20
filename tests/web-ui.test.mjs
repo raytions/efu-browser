@@ -7,6 +7,8 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { createScansHttpServer, createScansManager } from "../scripts/scans-service-lib.mjs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 
@@ -19,7 +21,17 @@ function findChromiumBin() {
   return null;
 }
 
+function findGduBin() {
+  for (const bin of [process.env.EFU_GDU_BIN, "/home/antigravity/.local/bin/gdu", "gdu"]) {
+    if (!bin) continue;
+    const res = spawnSync(bin, ["--version"], { encoding: "utf8" });
+    if (!res.error && res.status === 0) return bin;
+  }
+  return null;
+}
+
 const CHROME_BIN = findChromiumBin();
+const GDU_BIN = findGduBin();
 
 async function startBrowser() {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "efu-chrome-"));
@@ -167,6 +179,7 @@ function createTestServer(handlers) {
       "styles.css",
       "efu-core.js",
       "scans-demo-service.js",
+      "scans-real-service.js",
       "scans-view.js",
       "app.js",
     ]);
@@ -578,8 +591,12 @@ test("Web UI Scans demo on /efu-browser/ subpath: direct link + reload, simulate
     );
     assert.equal(clearHiddenWhenEmpty, "hidden");
 
-    // Confirm demo-after.efu was fetched under /efu-browser/ subpath
+    // Confirm demo-after.efu was fetched under /efu-browser/ subpath and demo mode NEVER called /api/scans
     assert.ok(srv.requests.includes("/efu-browser/demo/demo-after.efu"));
+    assert.deepEqual(
+      srv.requests.filter((p) => p.includes("/api/scans")),
+      []
+    );
     assert.deepEqual(page.consoleErrors, []);
   } finally {
     await page.close();
@@ -587,4 +604,223 @@ test("Web UI Scans demo on /efu-browser/ subpath: direct link + reload, simulate
     await srv.close();
   }
 });
+
+test("Web UI Real Mode end-to-end: lists real task, triggers gdu scan, preserves open Browser EFU until Open Result, loads /indexes/projects.efu and finds new file", { skip: !CHROME_BIN || !GDU_BIN }, async () => {
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "efu-web-real-"));
+  const allowedRoot = path.join(workDir, "nas");
+  const rootDir = path.join(allowedRoot, "projects");
+  const indexDir = path.join(workDir, "indexes");
+  fs.mkdirSync(path.join(rootDir, "docs"), { recursive: true });
+  fs.mkdirSync(indexDir, { recursive: true });
+  fs.writeFileSync(path.join(rootDir, "docs", "季度汇总 2026.pdf"), "real-scan-payload");
+
+  const manager = createScansManager({
+    indexDir,
+    allowTrigger: true,
+    gduBin: GDU_BIN,
+    logger: { log() {}, warn() {}, error() {} },
+    tasks: [
+      {
+        id: "projects",
+        name: "NAS 项目目录",
+        root: rootDir,
+        allowedRoot,
+        mountPoint: null,
+        excludes: [".snapshot"],
+        exportPrefix: "\\\\nas\\projects",
+        outputName: "projects.efu",
+        enabled: true,
+        schedule: "0 3 * * *",
+      },
+    ],
+  });
+
+  const apiServer = createScansHttpServer(manager, { apiBase: "/api/scans" });
+  const apiListening = await new Promise((resolve) => {
+    apiServer.listen(0, "127.0.0.1", () => {
+      const { port } = apiServer.address();
+      resolve({ origin: `http://127.0.0.1:${port}` });
+    });
+  });
+
+  const srv = await createTestServer({
+    basePath: "/",
+    custom: async (pathname, req, res) => {
+      if (pathname === "/config.json") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            indexes: [],
+            scans: { mode: "real", apiBase: "/api/scans" },
+          })
+        );
+        return true;
+      }
+
+      if (pathname.startsWith("/api/scans")) {
+        const upstream = await fetch(`${apiListening.origin}${req.url}`, {
+          method: req.method,
+        });
+        const body = await upstream.text();
+        res.writeHead(upstream.status, {
+          "Content-Type": upstream.headers.get("content-type") || "application/json",
+          "Cache-Control": "no-store",
+        });
+        res.end(body);
+        return true;
+      }
+
+      if (pathname.startsWith("/indexes/")) {
+        const fileName = path.basename(pathname);
+        const full = path.join(indexDir, fileName);
+        if (fileName.endsWith(".efu") && fs.existsSync(full)) {
+          const stat = fs.statSync(full);
+          res.writeHead(200, {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Last-Modified": stat.mtime.toUTCString(),
+            "Cache-Control": "no-cache",
+          });
+          res.end(fs.readFileSync(full));
+          return true;
+        }
+        res.writeHead(404);
+        res.end("Not Found");
+        return true;
+      }
+
+      return false;
+    },
+  });
+
+  const browser = await startBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.goto(`${srv.origin}/`);
+    await page.waitFor(() => Boolean(window.__efuApp) && window.__efuApp.state.scansMode === "real");
+
+    // 1. Open user's own local EFU in Browser first
+    await page.evaluate(() => {
+      const localEfu = "Filename,Size,Date Modified\r\n/local/keep-me.txt,123,134000000000000000\r\n";
+      const file = new File([localEfu], "keep-local.efu", { type: "text/plain" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const input = document.getElementById("file-upload");
+      input.files = dt.files;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await page.waitFor(() => document.getElementById("active-source").textContent === "keep-local.efu");
+
+    // 2. Navigate to Scans -> verify Real Mode banner & real task list (no demo mode)
+    await page.evaluate(() => document.getElementById("nav-scans").click());
+    await page.waitFor(() => Boolean(document.querySelector(".scans-real-badge")));
+
+    const realInitial = await page.evaluate(() => ({
+      navPill: document.getElementById("nav-scans-pill").textContent,
+      realBadge: document.querySelector(".scans-real-badge")?.textContent,
+      hasDemoBanner: Boolean(document.querySelector(".scans-demo-banner")),
+      taskTitle: document.querySelector(".scan-card h3")?.textContent,
+    }));
+    assert.equal(realInitial.navPill, "真实");
+    assert.equal(realInitial.realBadge, "真实模式");
+    assert.equal(realInitial.hasDemoBanner, false);
+    assert.equal(realInitial.taskTitle, "NAS 项目目录");
+
+    // 3. Trigger real scan via UI
+    await page.evaluate(() => document.querySelector('[data-action="start-scan"]').click());
+    await page.waitFor(
+      () => document.querySelector(".scan-card")?.dataset.status === "succeeded",
+      10000
+    );
+
+    // 4. Verify Browser's existing local EFU was NOT overwritten automatically after real scan finished
+    const beforeOpenResult = await page.evaluate(() => ({
+      activeSource: document.getElementById("active-source").textContent,
+      firstFile: document.querySelector("#results td.col-file")?.textContent,
+      openDisabled: document.querySelector('[data-action="open-result"]')?.disabled,
+    }));
+    assert.equal(beforeOpenResult.activeSource, "keep-local.efu");
+    assert.equal(beforeOpenResult.firstFile, "keep-me.txt");
+    assert.equal(beforeOpenResult.openDisabled, false);
+
+    // 5. Click "打开结果" -> loads /indexes/projects.efu and existing search finds 季度汇总 2026.pdf
+    await page.evaluate(() => document.querySelector('[data-action="open-result"]').click());
+    await page.waitFor(
+      () =>
+        !document.getElementById("browser-view").classList.contains("hidden") &&
+        document.getElementById("active-source").textContent === "NAS 项目目录"
+    );
+
+    await page.evaluate(() => {
+      const input = document.getElementById("search-input");
+      input.value = "季度汇总";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await page.waitFor(() => document.getElementById("filtered-count").textContent === "1");
+
+    const found = await page.evaluate(() => ({
+      fileName: document.querySelector("#results td.col-file")?.textContent,
+      fullPath: document.querySelector("#results td.col-path")?.textContent,
+    }));
+    assert.equal(found.fileName, "季度汇总 2026.pdf");
+    assert.equal(found.fullPath, "\\\\nas\\projects\\docs\\季度汇总 2026.pdf");
+    assert.deepEqual(page.consoleErrors, []);
+  } finally {
+    manager.shutdown();
+    await new Promise((r) => apiServer.close(r));
+    await page.close();
+    await browser.close();
+    await srv.close();
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("Web UI Real Mode shows readable error when backend is unavailable and never falls back to Demo mode", { skip: !CHROME_BIN }, async () => {
+  const srv = await createTestServer({
+    basePath: "/",
+    custom: async (pathname, _req, res) => {
+      if (pathname === "/config.json") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            indexes: [],
+            scans: { mode: "real", apiBase: "/api/scans" },
+          })
+        );
+        return true;
+      }
+      if (pathname.startsWith("/api/scans")) {
+        res.writeHead(502, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Bad Gateway" }));
+        return true;
+      }
+      return false;
+    },
+  });
+
+  const browser = await startBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.goto(`${srv.origin}/#/scans`);
+    await page.waitFor(() => Boolean(document.querySelector(".scan-error-card")));
+
+    const errState = await page.evaluate(() => ({
+      realBadge: document.querySelector(".scans-real-badge")?.textContent,
+      hasDemoBanner: Boolean(document.querySelector(".scans-demo-banner")),
+      errorHeading: document.querySelector(".scan-error-card h3")?.textContent,
+      errorBody: document.querySelector(".scan-error-card")?.textContent,
+      hasExampleNas: document.getElementById("scans-view").textContent.includes("Example NAS"),
+    }));
+    assert.equal(errState.realBadge, "真实模式");
+    assert.equal(errState.hasDemoBanner, false);
+    assert.match(errState.errorHeading, /无法连接/);
+    assert.match(errState.errorBody, /不会回退到演示模式/);
+    assert.equal(errState.hasExampleNas, false);
+    assert.deepEqual(page.consoleErrors, []);
+  } finally {
+    await page.close();
+    await browser.close();
+    await srv.close();
+  }
+});
+
 

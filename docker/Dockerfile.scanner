@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1
+FROM node:24-alpine
+
+ARG GDU_VERSION=v5.39.0
+ARG TARGETARCH=amd64
+
+RUN apk add --no-cache curl tar ca-certificates \
+  && case "$TARGETARCH" in \
+       amd64) GDU_ARCH="amd64" ;; \
+       arm64) GDU_ARCH="arm64" ;; \
+       *) echo "Unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
+     esac \
+  && curl -fsSL "https://github.com/dundee/gdu/releases/download/${GDU_VERSION}/gdu_linux_${GDU_ARCH}_static.tgz" \
+       -o /tmp/gdu.tgz \
+  && tar -xzf /tmp/gdu.tgz -C /tmp \
+  && mv "/tmp/gdu_linux_${GDU_ARCH}_static" /usr/local/bin/gdu \
+  && chmod 0755 /usr/local/bin/gdu \
+  && rm -f /tmp/gdu.tgz \
+  && /usr/local/bin/gdu --version
+
+WORKDIR /opt/efu-browser
+COPY package.json ./
+COPY scripts/efu-scan-lib.mjs scripts/efu-scan.mjs scripts/scans-service-lib.mjs scripts/scans-service.mjs ./scripts/
+
+RUN mkdir -p /app/indexes /config && chown -R node:node /app/indexes
+
+USER node
+
+ENV SCANS_MODE=real \
+    SCANS_HOST=0.0.0.0 \
+    SCANS_PORT=3001 \
+    SCANS_API_BASE=/api/scans \
+    SCANS_ALLOW_TRIGGER=false \
+    SCANS_TASKS_FILE=/config/scans.json \
+    SCANS_INDEX_DIR=/app/indexes \
+    EFU_GDU_BIN=/usr/local/bin/gdu
+
+EXPOSE 3001
+
+CMD ["node", "scripts/scans-service.mjs"]

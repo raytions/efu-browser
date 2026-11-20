@@ -1,15 +1,17 @@
 {
   "name": "efu-browser",
-  "version": "1.2.0",
-  "description": "Everything EFU static web browser, interactive Scans demo, and Linux/NAS scanner-to-EFU adapter CLI",
+  "version": "1.3.0",
+  "description": "Everything EFU static web browser, dual-mode Scans (demo/real), controlled scans API service, and Linux/NAS gdu-to-EFU CLI",
   "private": true,
   "bin": {
-    "efu-scan": "./scripts/efu-scan.mjs"
+    "efu-scan": "./scripts/efu-scan.mjs",
+    "efu-scans-service": "./scripts/scans-service.mjs"
   },
   "scripts": {
     "scan": "node scripts/efu-scan.mjs",
+    "scans-service": "node scripts/scans-service.mjs",
     "test": "node --test tests/*.test.mjs",
-    "lint": "node --check efu-core.js && node --check scans-demo-service.js && node --check scans-view.js && node --check app.js && node --check scripts/efu-scan-lib.mjs && node --check scripts/efu-scan.mjs"
+    "lint": "node --check efu-core.js && node --check scans-demo-service.js && node --check scans-real-service.js && node --check scans-view.js && node --check app.js && node --check scripts/efu-scan-lib.mjs && node --check scripts/efu-scan.mjs && node --check scripts/scans-service-lib.mjs && node --check scripts/scans-service.mjs"
   },
   "engines": {
     "node": ">=20.0.0"

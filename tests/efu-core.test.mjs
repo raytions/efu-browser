@@ -122,5 +122,17 @@ test("validates runtime config URLs for same-origin and subpath compatibility", 
   assert.equal(normalized.defaultIndex, "projects");
   assert.equal(normalized.indexes[0].url, "https://nas.example.local/efu-browser/indexes/projects.efu");
   assert.equal(normalized.indexes[1].url, "https://nas.example.local/indexes/media.efu");
+  assert.equal(normalized.scans.mode, "demo");
+  assert.equal(normalized.scans.apiBase, null);
   assert.equal(normalized.warnings.length, 2);
+
+  const realCfg = EfuCore.normalizeRuntimeConfig(
+    {
+      indexes: [],
+      scans: { mode: "real", apiBase: "/api/scans/" },
+    },
+    baseHref
+  );
+  assert.equal(realCfg.scans.mode, "real");
+  assert.equal(realCfg.scans.apiBase, "https://nas.example.local/api/scans");
 });

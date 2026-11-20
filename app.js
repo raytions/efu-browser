@@ -1,5 +1,6 @@
 const Core = typeof window !== "undefined" ? window.EfuCore : null;
 const ScansDemoService = typeof window !== "undefined" ? window.EfuScansDemoService : null;
+const ScansRealService = typeof window !== "undefined" ? window.EfuScansRealService : null;
 const ScansView = typeof window !== "undefined" ? window.EfuScansView : null;
 
 const RUNTIME_CONFIG_FILE = "config.json";
@@ -46,6 +47,8 @@ function resolveInitialTheme() {
 
 const state = {
   currentRoute: "browser",
+  scansMode: "demo",
+  scansApiBase: null,
   entries: [],
   filtered: [],
   sortKey: "FileName",
@@ -81,6 +84,7 @@ const refs = {
   scansView: document.getElementById("scans-view"),
   navBrowser: document.getElementById("nav-browser"),
   navScans: document.getElementById("nav-scans"),
+  navScansPill: document.getElementById("nav-scans-pill"),
   routeLinks: Array.from(document.querySelectorAll("[data-route]")),
   demoHintBanner: document.getElementById("demo-hint-banner"),
   demoHintText: document.getElementById("demo-hint-text"),
@@ -194,20 +198,75 @@ function navigateTo(route, { updateHash = true } = {}) {
       window.location.hash = desiredHash;
     }
   }
+
+  if (
+    targetRoute === "scans" &&
+    scansServiceInstance &&
+    !scansServiceInstance.isDemo &&
+    typeof scansServiceInstance.refresh === "function"
+  ) {
+    scansServiceInstance.refresh({ silent: scansServiceInstance.listJobs().length > 0 });
+  }
+}
+
+function updateScansModeBadge() {
+  if (!refs.navScansPill) return;
+  if (state.scansMode === "real") {
+    refs.navScansPill.textContent = "真实";
+    refs.navScansPill.classList.add("nav-real-pill");
+  } else {
+    refs.navScansPill.textContent = "演示";
+    refs.navScansPill.classList.remove("nav-real-pill");
+  }
 }
 
 function initScansSection() {
-  if (!refs.scansView || !ScansDemoService || !ScansView) return;
-  const serviceOptions =
+  if (!refs.scansView || !ScansView) return;
+
+  if (scansViewInstance) {
+    scansViewInstance.destroy();
+    scansViewInstance = null;
+  }
+  if (scansServiceInstance && typeof scansServiceInstance.dispose === "function") {
+    scansServiceInstance.dispose();
+    scansServiceInstance = null;
+  }
+
+  updateScansModeBadge();
+
+  if (state.scansMode === "real" && ScansRealService) {
+    const realOptions =
+      typeof window !== "undefined" && window.EFU_SCANS_REAL_OPTIONS
+        ? window.EFU_SCANS_REAL_OPTIONS
+        : {};
+    scansServiceInstance = ScansRealService.createRealScansService({
+      apiBase: state.scansApiBase || "/api/scans",
+      ...realOptions,
+    });
+    scansViewInstance = ScansView.createScansView({
+      container: refs.scansView,
+      service: scansServiceInstance,
+      onOpenResult: (payload) => {
+        openScanResult(payload);
+      },
+    });
+    if (state.currentRoute === "scans") {
+      scansServiceInstance.refresh();
+    }
+    return;
+  }
+
+  if (!ScansDemoService) return;
+  const demoOptions =
     typeof window !== "undefined" && window.EFU_SCANS_DEMO_OPTIONS
       ? window.EFU_SCANS_DEMO_OPTIONS
       : undefined;
-  scansServiceInstance = ScansDemoService.createDemoScansService(serviceOptions);
+  scansServiceInstance = ScansDemoService.createDemoScansService(demoOptions);
   scansViewInstance = ScansView.createScansView({
     container: refs.scansView,
     service: scansServiceInstance,
     onOpenResult: (payload) => {
-      openDemoResult(payload);
+      openScanResult(payload);
     },
   });
 }
@@ -216,7 +275,6 @@ async function init() {
   bindEvents();
   initialiseControls();
   applyTheme();
-  initScansSection();
   navigateTo(resolveRouteFromLocation(), { updateHash: false });
 
   await new Promise((resolve) => {
@@ -232,6 +290,7 @@ async function init() {
   updateSortIndicators();
 
   await loadRuntimeConfig();
+  initScansSection();
 
   if (state.serverIndexes.length > 0) {
     const initialId = state.defaultServerIndexId || state.serverIndexes[0].id;
@@ -302,6 +361,8 @@ async function loadRuntimeConfig() {
 
   state.serverIndexes = normalized.indexes;
   state.defaultServerIndexId = normalized.defaultIndex;
+  state.scansMode = normalized.scans?.mode === "real" ? "real" : "demo";
+  state.scansApiBase = normalized.scans?.apiBase || null;
   renderServerIndexControls();
 }
 
@@ -526,23 +587,38 @@ async function loadServerIndex(indexId, { isReload = false } = {}) {
   });
 }
 
-async function openDemoResult({ url, label, suggestedSearch = null } = {}) {
+async function openScanResult({ type = "demo", jobId = null, url, label, suggestedSearch = null } = {}) {
   const resolved = Core.resolveSameOriginUrl(url, window.location.href);
   if (!resolved.ok) {
     navigateTo("browser");
-    showStatusBanner(`无法打开演示快照：${resolved.error}`);
+    showStatusBanner(`无法打开扫描结果：${resolved.error}`);
     return false;
   }
   navigateTo("browser");
+  const sourceType = type === "real" ? "server" : "demo";
+  const matchedServerIndex =
+    sourceType === "server"
+      ? state.serverIndexes.find(
+          (item) =>
+            item.id === jobId ||
+            item.url === resolved.url ||
+            item.displayPath === resolved.displayPath
+        )
+      : null;
+
   return loadRemoteEfu({
     url: resolved.url,
     displayPath: resolved.displayPath,
-    label: label || "演示快照",
-    type: "demo",
-    id: null,
+    label: label || (sourceType === "server" ? "服务器快照" : "演示快照"),
+    type: sourceType,
+    id: matchedServerIndex ? matchedServerIndex.id : null,
     isReload: false,
-    suggestedSearch,
+    suggestedSearch: sourceType === "demo" ? suggestedSearch : null,
   });
+}
+
+async function openDemoResult(payload) {
+  return openScanResult({ ...payload, type: "demo" });
 }
 
 function ingestContent(text, sourceMeta) {

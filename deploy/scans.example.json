@@ -1,0 +1,16 @@
+{
+  "tasks": [
+    {
+      "id": "projects",
+      "name": "NAS 项目目录",
+      "root": "/mnt/nas/projects",
+      "allowedRoot": "/mnt/nas",
+      "mountPoint": "/mnt/nas",
+      "excludes": [".snapshot", "@eaDir"],
+      "exportPrefix": "\\\\nas\\projects",
+      "outputName": "projects.efu",
+      "enabled": true,
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

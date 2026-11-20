@@ -1553,6 +1553,90 @@ td.hidden-column {
   line-height: 1.5;
 }
 
+.nav-real-pill {
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+}
+
+:root.theme-dark .nav-real-pill {
+  color: #86efac;
+}
+
+.scans-real-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 14px 18px;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  box-shadow: var(--shadow-sm);
+}
+
+.scans-real-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  flex-shrink: 0;
+}
+
+:root.theme-dark .scans-real-badge {
+  color: #86efac;
+}
+
+.scan-status-failed {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.scan-error-card {
+  background: var(--surface);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-xl);
+  padding: 22px 24px;
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.scan-error-card h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.scan-error-card p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.scan-error-hint {
+  color: var(--text-secondary) !important;
+  font-size: 13px !important;
+}
+
+.scan-error-inline {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .scans-header {
   display: flex;
   align-items: flex-end;

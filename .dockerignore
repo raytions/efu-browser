@@ -8,8 +8,7 @@
 efu/
 indexes/
 
-# Ignore CLI, tests, and deployment templates not needed in nginx static image
-scripts/
+# Ignore tests, deployment templates, and docs not needed in Docker images
 tests/
 deploy/
 docs/
