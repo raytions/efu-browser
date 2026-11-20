@@ -551,9 +551,19 @@ test("Web UI Scans demo on /efu-browser/ subpath: direct link + reload, simulate
     const searchRes = await page.evaluate(() => ({
       matchedFile: document.querySelector("#results td.col-file")?.textContent,
       matchedPath: document.querySelector("#results td.col-path")?.textContent,
+      clearVisibleWhenFilled: getComputedStyle(document.getElementById("clear-search")).visibility,
     }));
     assert.equal(searchRes.matchedFile, "demo-slide-003.svs");
     assert.equal(searchRes.matchedPath, "/mnt/example-nas/demo-archive/slides/demo-slide-003.svs");
+    assert.equal(searchRes.clearVisibleWhenFilled, "visible");
+
+    // Clicking custom clear button empties input and hides the button again
+    await page.evaluate(() => document.getElementById("clear-search").click());
+    await page.waitFor(() => document.getElementById("filtered-count").textContent === "6");
+    const clearHiddenWhenEmpty = await page.evaluate(
+      () => getComputedStyle(document.getElementById("clear-search")).visibility
+    );
+    assert.equal(clearHiddenWhenEmpty, "hidden");
 
     // Confirm demo-after.efu was fetched under /efu-browser/ subpath
     assert.ok(srv.requests.includes("/efu-browser/demo/demo-after.efu"));

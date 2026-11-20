@@ -625,6 +625,24 @@ button:disabled {
   font-size: 14px;
   color: var(--text-primary);
   min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+#search-input::-webkit-search-decoration,
+#search-input::-webkit-search-cancel-button,
+#search-input::-webkit-search-results-button,
+#search-input::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+
+#search-input::-ms-clear,
+#search-input::-ms-reveal {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 #search-input::placeholder {
@@ -642,7 +660,14 @@ button:disabled {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+  flex-shrink: 0;
+  transition: color var(--dur) var(--ease), background-color var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+
+#search-input:placeholder-shown + #clear-search {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 #clear-search:hover {
