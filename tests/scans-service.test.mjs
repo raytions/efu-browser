@@ -348,8 +348,115 @@ test("Scans API end-to-end executes real efu-scan.mjs + gdu and publishes EFU sn
   }
 });
 
+test("Scans API preserves old EFU byte-for-byte on real gdu read_error (unreadable subdir, non-root) and on interrupted scan (SIGTERM)", { skip: !GDU_BIN }, async () => {
+  assert.notEqual(process.getuid(), 0, "Permission error test must NOT run as root");
+
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "efu-api-fail-"));
+  const allowedRoot = path.join(workDir, "nas");
+  const rootDir = path.join(allowedRoot, "projects");
+  const unreadableDir = path.join(rootDir, "locked-secret");
+  const indexDir = path.join(workDir, "indexes");
+  const outFile = path.join(indexDir, "projects.efu");
+  fs.mkdirSync(unreadableDir, { recursive: true });
+  fs.mkdirSync(indexDir, { recursive: true });
+  fs.writeFileSync(path.join(rootDir, "good.txt"), "good");
+  fs.writeFileSync(path.join(unreadableDir, "hidden.txt"), "secret");
+
+  // 1. Run a real successful scan first to produce a baseline snapshot
+  const manager = createScansManager({
+    indexDir,
+    allowTrigger: true,
+    gduBin: GDU_BIN,
+    logger: { log() {}, warn() {}, error() {} },
+    tasks: [
+      {
+        id: "projects",
+        name: "NAS 项目目录",
+        root: rootDir,
+        allowedRoot,
+        mountPoint: null,
+        excludes: [],
+        exportPrefix: "\\\\nas\\projects",
+        outputName: "projects.efu",
+        enabled: true,
+      },
+    ],
+  });
+
+  const srv = await listenServer(createScansHttpServer(manager));
+  try {
+    const okRun = await fetch(`${srv.origin}/api/scans/projects/run`, { method: "POST" });
+    assert.equal(okRun.status, 202);
+    await manager.waitForIdle(10000);
+
+    const okStatus = await (await fetch(`${srv.origin}/api/scans/projects/status`)).json();
+    assert.equal(okStatus.task.status, "succeeded");
+    assert.equal(okStatus.task.entryCount, 2);
+    const baselineHash = sha256File(outFile);
+    const baselineSuccessAt = okStatus.task.lastSuccessAt;
+
+    // 2. Make subdirectory unreadable -> real gdu emits read_error=true -> API marks failed & preserves old EFU
+    fs.chmodSync(unreadableDir, 0o000);
+    const errRun = await fetch(`${srv.origin}/api/scans/projects/run`, { method: "POST" });
+    assert.equal(errRun.status, 202);
+    await manager.waitForIdle(10000);
+
+    assert.equal(sha256File(outFile), baselineHash, "Old EFU must remain byte-for-byte identical on real gdu read_error");
+    const errStatus = await (await fetch(`${srv.origin}/api/scans/projects/status`)).json();
+    assert.equal(errStatus.task.status, "failed");
+    assert.match(errStatus.task.errorSummary, /不可读目录|读取错误/);
+    assert.ok(!errStatus.task.errorSummary.includes(unreadableDir), "Error summary must not leak internal path");
+    assert.equal(errStatus.task.lastSuccessAt, baselineSuccessAt);
+    assert.equal(errStatus.task.entryCount, 2);
+    fs.chmodSync(unreadableDir, 0o755);
+
+    // 3. Interrupted scan (SIGTERM via shutdown/signal) -> preserves old EFU and reports interruption
+    const hangCli = path.join(workDir, "hang-cli.mjs");
+    fs.writeFileSync(hangCli, "setInterval(() => {}, 1000);\n", "utf8");
+    const manager2 = createScansManager({
+      indexDir,
+      allowTrigger: true,
+      cliScriptPath: hangCli,
+      logger: { log() {}, warn() {}, error() {} },
+      tasks: [
+        {
+          id: "projects",
+          name: "NAS 项目目录",
+          root: rootDir,
+          allowedRoot,
+          mountPoint: null,
+          excludes: [],
+          exportPrefix: null,
+          outputName: "projects.efu",
+          enabled: true,
+        },
+      ],
+    });
+    const trig = manager2.triggerScan("projects");
+    assert.equal(trig.ok, true);
+    await new Promise((r) => setTimeout(r, 60));
+    manager2.shutdown();
+    await new Promise((r) => setTimeout(r, 120));
+
+    assert.equal(sha256File(outFile), baselineHash, "Old EFU must remain byte-for-byte identical on interrupted scan");
+    const intrTask = manager2.getPublicTask("projects");
+    assert.equal(intrTask.status, "failed");
+    assert.match(intrTask.errorSummary, /意外中断/);
+  } finally {
+    try {
+      fs.chmodSync(unreadableDir, 0o755);
+    } catch {
+      // ignore
+    }
+    manager.shutdown();
+    await srv.close();
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
 test("sanitizeScanError masks internal stderr and paths", () => {
   const err = sanitizeScanError("open /mnt/secret/dir: permission denied", 1);
   assert.ok(!err.includes("/mnt/secret/dir"));
   assert.match(err, /不可读目录|读取错误/);
+  assert.match(sanitizeScanError("", null, "SIGTERM"), /意外中断/);
 });

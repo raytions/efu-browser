@@ -763,6 +763,31 @@ test("Web UI Real Mode end-to-end: lists real task, triggers gdu scan, preserves
     }));
     assert.equal(found.fileName, "季度汇总 2026.pdf");
     assert.equal(found.fullPath, "\\\\nas\\projects\\docs\\季度汇总 2026.pdf");
+
+    // 6. If loading a real EFU fails (e.g. deleted/500), Browser keeps existing results intact
+    fs.unlinkSync(path.join(indexDir, "projects.efu"));
+    await page.evaluate(() => window.__efuApp.openScanResult({
+      type: "real",
+      jobId: "projects",
+      url: "/indexes/projects.efu",
+      label: "NAS 项目目录",
+    }));
+    await page.waitFor(() => !document.getElementById("status-banner").classList.contains("hidden"));
+    const afterLoadErr = await page.evaluate(() => ({
+      banner: document.getElementById("status-banner-text").textContent,
+      preservedFile: document.querySelector("#results td.col-file")?.textContent,
+      preservedSource: document.getElementById("active-source").textContent,
+    }));
+    assert.match(afterLoadErr.banner, /HTTP 404/);
+    assert.equal(afterLoadErr.preservedFile, "季度汇总 2026.pdf");
+    assert.equal(afterLoadErr.preservedSource, "NAS 项目目录");
+
+    // 7. Direct refresh on #/scans stays in Real Mode
+    await page.goto(`${srv.origin}/#/scans`);
+    await page.waitFor(() => Boolean(document.querySelector(".scans-real-badge")));
+    await page.evaluate(() => window.location.reload());
+    await page.waitFor(() => Boolean(document.querySelector(".scans-real-badge")));
+
     assert.deepEqual(page.consoleErrors, []);
   } finally {
     manager.shutdown();

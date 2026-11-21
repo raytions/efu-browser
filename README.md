@@ -87,11 +87,31 @@ EFU_CONFIG_FILE=./deploy/config.example.json \
 
 ---
 
-### 方式二：自托管 Docker 真实模式（`SCANS_MODE=real`，含受控扫描 API）
+## 自托管真实模式
 
-当希望在 Scans 页面查看真实任务状态并（可选）从网页触发服务器端扫描时，通过环境变量与 Compose `real-scans` profile 启用：
+> 扫描任务可由系统定时调度运行；自托管真实模式下，也可通过受保护的 Scans API 手动触发已配置任务。GitHub Pages 演示模式不访问真实文件系统。
 
-#### 1. 准备受控扫描任务配置 [`deploy/scans.example.json`](deploy/scans.example.json)
+### 1. 启用 `SCANS_MODE=real`
+
+在 `.env` 中启用真实模式并启动带 `real-scans` profile 的双容器部署（参考 [`.env.example`](.env.example)）：
+
+```bash
+cp .env.example .env
+# 在 .env 中设置：
+#   SCANS_MODE=real
+#   SCANS_API_BASE=/api/scans
+#   SCANS_ALLOW_TRIGGER=true      # 默认 false（后端强制返回 403，仅查看状态）
+#   SCANS_TASKS_FILE=/config/scans.json
+#   SCANS_INDEX_DIR=/app/indexes
+#   EFU_GDU_BIN=/usr/local/bin/gdu
+#   NAS_SOURCE_DIR=/mnt/nas
+
+docker compose -f docker-compose.env.yml --profile real-scans up -d --build
+```
+
+### 2. 受控任务配置（`/config/scans.json`）
+
+管理员通过只读挂载配置文件维护任务（本版本不提供网页创建/编辑任务），示例见 [`deploy/scans.example.json`](deploy/scans.example.json)：
 
 ```json
 {
@@ -105,39 +125,60 @@ EFU_CONFIG_FILE=./deploy/config.example.json \
       "excludes": [".snapshot", "@eaDir"],
       "exportPrefix": "\\\\nas\\projects",
       "outputName": "projects.efu",
-      "enabled": true,
-      "schedule": "0 3 * * *"
+      "enabled": true
     }
   ]
 }
 ```
 
-#### 2. 配置环境变量（参考 [`.env.example`](.env.example)）并启动双容器
+关键字段与后端校验规则：
 
-```bash
-cp .env.example .env
-# 在 .env 中设置：
-#   SCANS_MODE=real
-#   SCANS_API_BASE=/api/scans
-#   SCANS_ALLOW_TRIGGER=true      # 默认 false（仅查看状态，POST /run 返回 403）
-#   SCANS_TASKS_FILE=/config/scans.json
-#   SCANS_INDEX_DIR=/app/indexes
-#   EFU_GDU_BIN=/usr/local/bin/gdu
-#   NAS_SOURCE_DIR=/mnt/nas
+- `id`：稳定且 URL 安全的标识（仅允许字母、数字、`.`、`_`、`-`）。
+- `name`：网页展示名称。
+- `allowedRoot` / `root`：均必须为无 `..` 路径穿越的绝对路径；后端在配置加载时与每次运行前（结合 `realpath` 防软链逃逸）强制校验 `root` 等于或位于 `allowedRoot` 之下。
+- `mountPoint`：可选绝对路径，透传给 `efu-scan.mjs --require-mount`（扫描前与发布前均校验 `/proc/self/mountinfo`）。
+- `excludes`：字符串数组，透传给可重复的 `--exclude`，在 `gdu` 遍历阶段剪枝跳过。
+- `exportPrefix`：可选，仅用于 EFU 路径前缀改写（例如 `\\nas\projects`），不改变实际扫描位置。
+- `outputName`：仅允许安全 `.efu` 文件名（禁止路径分隔符与 `..`），输出严格限制在 `SCANS_INDEX_DIR` 内。
+- `enabled`：布尔值；禁用任务在后端强制拒绝触发（`403`）。
 
-docker compose -f docker-compose.env.yml --profile real-scans up -d --build
+### 3. 从 Scans 触发并在 Browser 打开结果
+
+1. 访问 <http://127.0.0.1:8080/#/scans>（生产环境请经反向代理认证后访问）。
+2. 页面顶部显著标识「真实模式」，列出任务状态、上次成功时间、条目数和脱敏错误摘要。
+3. 点击「立即扫描」→ 调用 `POST /api/scans/projects/run` → 后端用参数数组调用 `node scripts/efu-scan.mjs`（运行中重复触发返回 `409`）。
+4. 扫描完成后**不会自动覆盖** Browser 当前已打开的索引；点击「打开结果」跳回 Browser 并通过同源 `/indexes/projects.efu` 加载新快照，复用现有搜索、排序与分页。
+5. 若扫描后端不可用，页面显示可读错误提示，**不会回退到演示模式，也不会展示模拟数据**。
+
+### 4. `/api/scans` 权限边界与反向代理保护
+
+- **容器与网络隔离**：
+  - `efu-browser`（Web/Nginx 容器）仅只读挂载 `./indexes:/app/indexes:ro` 与 `/config/config.json:ro`，**不挂载原始 NAS 目录**，默认仅绑定 `127.0.0.1:8080`。
+  - `efu-scanner`（扫描 API 容器）以非 root `node` 运行，仅对 `/mnt/nas:ro` 只读、`/app/indexes:rw` 可写，且**不向宿主机暴露端口**，仅限内部网络由 Nginx 反代。
+  - API 响应只返回脱敏后的状态与错误摘要，不暴露服务器绝对路径、原始 `gdu` stderr、任务内部配置或环境变量。
+- **反向代理认证保护示例（Nginx）**：生产环境中务必在入口反向代理对整站（包含 `/config.json`、`/indexes/` 与 `/api/scans`）启用认证（如 Basic Auth / Authelia / Authentik / Tailscale）：
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name nas-search.internal.example;
+
+    # 统一保护前端、config.json、/indexes/*.efu 与 /api/scans
+    auth_basic "EFU Browser";
+    auth_basic_user_file /etc/nginx/.htpasswd_efu;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
-#### 3. 完整使用闭环
+### 5. 定时扫描与手动触发如何共存
 
-1. 浏览器访问 <http://127.0.0.1:8080/#/scans>（请通过反向代理做好认证保护）。
-2. 页面顶部显示「真实模式」，列出 `NAS 项目目录` 任务及其状态、上次成功时间、条目数和错误摘要。
-3. 点击「立即扫描」→ Nginx 同源反代 `POST /api/scans/projects/run` 至内部 `efu-scanner` 容器 → 后端使用参数数组调用 `node scripts/efu-scan.mjs` + `gdu` 原子发布 `/app/indexes/projects.efu`（运行中重复触发返回 `409`）。
-4. 扫描完成后**不会自动覆盖** Browser 当前已打开的索引；点击「打开结果」跳回 Browser 并加载 `/indexes/projects.efu`，使用现有搜索框直接检索新增文件。
-
-> 权限隔离原则：
-> - **`efu-browser`（Web/Nginx 容器）**：仅只读挂载 `./indexes:/app/indexes:ro` 与 `/config/config.json:ro`，**绝不挂载原始 NAS 目录**。
-> - **`efu-scanner`（扫描 API 容器）**：以非 root `node` 用户运行，**仅对 NAS 源目录只读**（`/mnt/nas:ro`），**仅对受控索引目录可写**（`/app/indexes:rw`），且**不向宿主机暴露端口**，仅通过 Compose 内部网络由 Nginx 反代。
+- `scripts/efu-scan.mjs` 使用“目标同目录随机临时文件 + `fsync` + 原子 `rename`”发布快照；
+- 无人值守更新继续交给 `systemd timer` 或 `cron`，网页「立即扫描」作为按需补充，二者写入同一个 `/indexes/*.efu` 时不会产生半写入损坏快照（建议错开时间窗口，避免同一目录重复消耗 NAS I/O）。
 
 ---
 
@@ -154,7 +195,7 @@ docker compose -f docker-compose.env.yml --profile real-scans up -d --build
 
 ### 受控扫描 API 端点（`scripts/scans-service.mjs`）
 
-- `GET /api/scans`：返回 `{ mode: "real", allowTrigger, tasks }`（仅含脱敏后的任务元信息、状态、上次成功时间、条目数、错误摘要与同源 `indexUrl`，不泄露服务器路径、任务内部配置或环境变量）。
+- `GET /api/scans`：返回 `{ mode: "real", allowTrigger, tasks }`（脱敏任务元信息、状态、上次成功时间、条目数、错误摘要与同源 `indexUrl`）。
 - `POST /api/scans/:id/run`：触发已启用任务（`SCANS_ALLOW_TRIGGER=false` 或任务禁用返回 `403`；任务运行中重复触发返回 `409`；正常接受返回 `202`）。
 - `GET /api/scans/:id/status`：查询单个任务运行状态。
 - `GET /api/scans/:id/index-url`：返回该任务对应的同源 EFU URL 及快照存在标记。
@@ -164,7 +205,7 @@ docker compose -f docker-compose.env.yml --profile real-scans up -d --build
 
 ## 定时扫描调度示例（无人值守主力更新）
 
-UI 的「立即扫描」只是按需补充，定时快照更新仍建议交给 `systemd timer` 或 `cron`：
+扫描任务可由系统定时调度运行；自托管真实模式下，也可通过受保护的 Scans API 手动触发已配置任务。GitHub Pages 演示模式不访问真实文件系统。
 
 ### 方式 A：systemd timer（推荐）
 

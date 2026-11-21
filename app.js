@@ -1553,6 +1553,7 @@ if (typeof window !== "undefined") {
     state,
     navigateTo,
     loadServerIndex,
+    openScanResult,
     openDemoResult,
     ingestContent,
     applySearch,

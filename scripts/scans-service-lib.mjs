@@ -192,7 +192,10 @@ export function assertRuntimeRootWithinAllowedRoot(task) {
   }
 }
 
-export function sanitizeScanError(stderrText, exitCode) {
+export function sanitizeScanError(stderrText, exitCode, signal = null) {
+  if (signal) {
+    return "扫描进程意外中断，已保留上一份快照";
+  }
   const msg = String(stderrText || "");
   if (/挂载点检查失败/.test(msg)) {
     return "挂载点校验失败，已保留上一份快照";
@@ -474,7 +477,7 @@ export function createScansManager(options = {}) {
     });
 
     let settled = false;
-    const finish = (exitCode, spawnError = null) => {
+    const finish = (exitCode, spawnError = null, signal = null) => {
       if (settled) return;
       settled = true;
       activeProcesses.delete(task.id);
@@ -483,7 +486,7 @@ export function createScansManager(options = {}) {
       st.lastFinishedAt = finishedAt;
       st.lastExitCode = typeof exitCode === "number" ? exitCode : 1;
 
-      if (!spawnError && exitCode === 0) {
+      if (!spawnError && !signal && exitCode === 0) {
         const match = stdoutBuf.match(/entries=(\d+)/);
         const parsedEntries = match ? Number.parseInt(match[1], 10) : null;
         st.status = "succeeded";
@@ -500,16 +503,16 @@ export function createScansManager(options = {}) {
         const hasReadError = /read_error|permission denied/i.test(combinedErr);
         const stderrBrief = combinedErr.replace(/\s+/g, " ").slice(0, 300);
         logger.error(
-          `[scans-service] task=${task.id} failed exitCode=${st.lastExitCode} readError=${hasReadError} stderr="${stderrBrief}"`
+          `[scans-service] task=${task.id} failed exitCode=${st.lastExitCode} signal=${signal || "none"} readError=${hasReadError} stderr="${stderrBrief}"`
         );
         st.status = "failed";
-        st.errorSummary = sanitizeScanError(combinedErr, st.lastExitCode);
+        st.errorSummary = sanitizeScanError(combinedErr, st.lastExitCode, signal);
       }
       persistStates();
     };
 
-    child.on("error", (err) => finish(1, err));
-    child.on("close", (code) => finish(code));
+    child.on("error", (err) => finish(1, err, null));
+    child.on("close", (code, signal) => finish(code, null, signal));
 
     return {
       ok: true,
