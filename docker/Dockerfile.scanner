@@ -22,7 +22,7 @@ WORKDIR /opt/efu-browser
 COPY package.json ./
 COPY scripts/efu-scan-lib.mjs scripts/efu-scan.mjs scripts/scans-service-lib.mjs scripts/scans-service.mjs ./scripts/
 
-RUN mkdir -p /app/indexes /config && chown -R node:node /app/indexes
+RUN mkdir -p /app/indexes /config && chown -R node:node /app/indexes /config
 
 USER node
 
@@ -31,6 +31,8 @@ ENV SCANS_MODE=real \
     SCANS_PORT=3001 \
     SCANS_API_BASE=/api/scans \
     SCANS_ALLOW_TRIGGER=false \
+    SCANS_ALLOW_MANAGE=false \
+    SCANS_ALLOWED_ROOTS= \
     SCANS_TASKS_FILE=/config/scans.json \
     SCANS_INDEX_DIR=/app/indexes \
     EFU_GDU_BIN=/usr/local/bin/gdu

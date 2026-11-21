@@ -1,4 +1,5 @@
 {
+  "allowedRoots": ["/mnt/nas"],
   "tasks": [
     {
       "id": "projects",
@@ -9,8 +10,7 @@
       "excludes": [".snapshot", "@eaDir"],
       "exportPrefix": "\\\\nas\\projects",
       "outputName": "projects.efu",
-      "enabled": true,
-      "schedule": "0 3 * * *"
+      "enabled": true
     }
   ]
 }

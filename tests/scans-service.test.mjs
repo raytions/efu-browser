@@ -34,7 +34,11 @@ function listenServer(server) {
       const { port } = server.address();
       resolve({
         origin: `http://127.0.0.1:${port}`,
-        close: () => new Promise((r) => server.close(r)),
+        close: () =>
+          new Promise((r) => {
+            server.closeAllConnections?.();
+            server.close(r);
+          }),
       });
     });
   });
@@ -130,13 +134,36 @@ test("Scans API enforces SCANS_ALLOW_TRIGGER=false (403), disabled tasks (403), 
     const listBody = await listRes.json();
     assert.equal(listBody.mode, "real");
     assert.equal(listBody.allowTrigger, false);
+    assert.equal(listBody.allowManage, false);
     assert.equal(listBody.tasks.length, 1);
 
-    // Ensure sensitive internal fields are NOT exposed in public API
-    const rawJson = JSON.stringify(listBody);
-    assert.ok(!rawJson.includes(rootDir), "API must not leak internal root path");
-    assert.ok(!rawJson.includes(allowedRoot), "API must not leak internal allowedRoot");
-    assert.equal(listBody.tasks[0].indexUrl, "/indexes/projects.efu");
+    // Authorized task metadata is returned for UI display, while internal boundary/system paths are not exposed
+    const task0 = listBody.tasks[0];
+    assert.equal(task0.root, rootDir);
+    assert.deepEqual(task0.excludes, [".snapshot"]);
+    assert.equal(task0.outputName, "projects.efu");
+    assert.equal(task0.indexUrl, "/indexes/projects.efu");
+    assert.equal("allowedRoot" in task0, false);
+    assert.equal("mountPoint" in task0, false);
+    assert.equal("outputPath" in task0, false);
+
+    // SCANS_ALLOW_MANAGE=false MUST return 403 on backend for POST/PATCH/DELETE
+    const createDenied = await fetch(`${srv.origin}/api/scans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Test", root: rootDir, outputName: "test.efu" }),
+    });
+    assert.equal(createDenied.status, 403);
+
+    const patchDenied = await fetch(`${srv.origin}/api/scans/projects`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Renamed" }),
+    });
+    assert.equal(patchDenied.status, 403);
+
+    const delDenied = await fetch(`${srv.origin}/api/scans/projects`, { method: "DELETE" });
+    assert.equal(delDenied.status, 403);
 
     // SCANS_ALLOW_TRIGGER=false MUST return 403 on backend
     const runRes = await fetch(`${srv.origin}/api/scans/projects/run`, { method: "POST" });
@@ -459,4 +486,233 @@ test("sanitizeScanError masks internal stderr and paths", () => {
   assert.ok(!err.includes("/mnt/secret/dir"));
   assert.match(err, /不可读目录|读取错误/);
   assert.match(sanitizeScanError("", null, "SIGTERM"), /意外中断/);
+});
+
+test("GET /api/scan-roots and /api/scan-roots/:rootId/entries list immediate subdirectories only and block traversal/symlink escapes", async () => {
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "efu-roots-api-"));
+  const nasRoot = path.join(workDir, "nas");
+  const dataRoot = path.join(workDir, "data");
+  const outsideSecret = path.join(workDir, "secret-outside");
+  const indexDir = path.join(workDir, "indexes");
+
+  fs.mkdirSync(path.join(nasRoot, "research", "slides"), { recursive: true });
+  fs.mkdirSync(path.join(nasRoot, "archive"), { recursive: true });
+  fs.mkdirSync(path.join(dataRoot, "lab-a"), { recursive: true });
+  fs.mkdirSync(outsideSecret, { recursive: true });
+  fs.mkdirSync(indexDir, { recursive: true });
+
+  // Regular file that must NOT appear in directory listing
+  fs.writeFileSync(path.join(nasRoot, "secret-file.txt"), "do-not-read-contents");
+  fs.writeFileSync(path.join(nasRoot, "research", "nested-file.svs"), "binary");
+
+  // Symlink escaping allowedRoot (must be hidden and blocked)
+  fs.symlinkSync(outsideSecret, path.join(nasRoot, "escape-link"));
+  // Symlink staying inside allowedRoot (safe to display)
+  fs.symlinkSync(path.join(nasRoot, "archive"), path.join(nasRoot, "safe-link"));
+
+  const manager = createScansManager({
+    indexDir,
+    allowedRoots: [nasRoot, dataRoot],
+    allowManage: true,
+    tasks: [],
+  });
+
+  const srv = await listenServer(createScansHttpServer(manager));
+  try {
+    // 1. GET /api/scan-roots
+    const rootsRes = await fetch(`${srv.origin}/api/scan-roots`);
+    assert.equal(rootsRes.status, 200);
+    const rootsBody = await rootsRes.json();
+    assert.equal(rootsBody.mode, "real");
+    assert.equal(rootsBody.roots.length, 2);
+    const nasId = rootsBody.roots[0].id;
+    assert.equal(rootsBody.roots[0].path, nasRoot);
+
+    // 2. Top-level entries under nasRoot: immediate subdirs only, no files, no escape symlink
+    const topRes = await fetch(`${srv.origin}/api/scan-roots/${encodeURIComponent(nasId)}/entries`);
+    assert.equal(topRes.status, 200);
+    const topBody = await topRes.json();
+    assert.equal(topBody.currentPath, nasRoot);
+    assert.equal(topBody.relativePath, "");
+    assert.equal(topBody.parentRelativePath, null);
+    const topNames = topBody.entries.map((e) => e.name);
+    assert.deepEqual(topNames, ["archive", "research", "safe-link"]);
+    assert.ok(!topNames.includes("secret-file.txt"));
+    assert.ok(!topNames.includes("escape-link"));
+
+    // 3. Step into research -> shows slides only (not nested-file.svs), parentRelativePath is ""
+    const subRes = await fetch(
+      `${srv.origin}/api/scan-roots/${encodeURIComponent(nasId)}/entries?path=research`
+    );
+    assert.equal(subRes.status, 200);
+    const subBody = await subRes.json();
+    assert.equal(subBody.currentPath, path.join(nasRoot, "research"));
+    assert.equal(subBody.relativePath, "research");
+    assert.equal(subBody.parentRelativePath, "");
+    assert.deepEqual(
+      subBody.entries.map((e) => e.name),
+      ["slides"]
+    );
+
+    // 4. Reject arbitrary absolute path
+    const absRes = await fetch(
+      `${srv.origin}/api/scan-roots/${encodeURIComponent(nasId)}/entries?path=/etc`
+    );
+    assert.equal(absRes.status, 400);
+
+    // 5. Reject path traversal
+    const travRes = await fetch(
+      `${srv.origin}/api/scan-roots/${encodeURIComponent(nasId)}/entries?path=../secret-outside`
+    );
+    assert.equal(travRes.status, 400);
+
+    // 6. Reject direct traversal into symlink escaping allowedRoot
+    const escRes = await fetch(
+      `${srv.origin}/api/scan-roots/${encodeURIComponent(nasId)}/entries?path=escape-link`
+    );
+    assert.equal(escRes.status, 403);
+
+    // 7. Unknown rootId returns 404
+    const missingRes = await fetch(`${srv.origin}/api/scan-roots/nonexistent/entries`);
+    assert.equal(missingRes.status, 404);
+  } finally {
+    manager.shutdown();
+    await srv.close();
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+});
+
+test("POST/PATCH/DELETE /api/scans validates boundaries, persists scans.json, runs gdu, and preserves historical EFU on delete", { skip: !GDU_BIN }, async () => {
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "efu-crud-api-"));
+  const nasRoot = path.join(workDir, "nas");
+  const slidesDir = path.join(nasRoot, "slides");
+  const outsideDir = path.join(workDir, "outside");
+  const indexDir = path.join(workDir, "indexes");
+  const tasksFile = path.join(workDir, "config", "scans.json");
+
+  fs.mkdirSync(path.join(slidesDir, "batch-1"), { recursive: true });
+  fs.mkdirSync(path.join(slidesDir, ".snapshot"), { recursive: true });
+  fs.mkdirSync(outsideDir, { recursive: true });
+  fs.mkdirSync(indexDir, { recursive: true });
+  fs.writeFileSync(path.join(slidesDir, "batch-1", "sample-01.svs"), "slide-bytes");
+  fs.writeFileSync(path.join(slidesDir, ".snapshot", "ignored.svs"), "ignore-me");
+  fs.symlinkSync(outsideDir, path.join(nasRoot, "bad-link"));
+
+  const manager = createScansManager({
+    tasksFile,
+    indexDir,
+    allowedRoots: [nasRoot],
+    allowTrigger: true,
+    allowManage: true,
+    gduBin: GDU_BIN,
+    logger: { log() {}, warn() {}, error() {} },
+  });
+
+  const srv = await listenServer(createScansHttpServer(manager));
+  try {
+    // Reject path outside allowedRoots
+    const badRoot = await fetch(`${srv.origin}/api/scans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Bad", root: outsideDir, outputName: "bad.efu" }),
+    });
+    assert.equal(badRoot.status, 400);
+
+    // Reject symlink escaping allowedRoots
+    const badLink = await fetch(`${srv.origin}/api/scans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Escape",
+        root: path.join(nasRoot, "bad-link"),
+        outputName: "escape.efu",
+      }),
+    });
+    assert.equal(badLink.status, 400);
+
+    // Reject unsafe outputName
+    const badOut = await fetch(`${srv.origin}/api/scans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "BadOut",
+        root: slidesDir,
+        outputName: "../evil.efu",
+      }),
+    });
+    assert.equal(badOut.status, 400);
+
+    // Create valid task via POST /api/scans
+    const createdRes = await fetch(`${srv.origin}/api/scans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "科研切片",
+        root: slidesDir,
+        excludes: [".snapshot", "@eaDir"],
+        exportPrefix: "\\\\nas\\slides",
+        outputName: "slides.efu",
+      }),
+    });
+    assert.equal(createdRes.status, 201);
+    const createdBody = await createdRes.json();
+    assert.equal(createdBody.task.id, "slides");
+    assert.equal(createdBody.task.root, slidesDir);
+    assert.deepEqual(createdBody.task.excludes, [".snapshot", "@eaDir"]);
+    assert.equal(createdBody.task.indexUrl, "/indexes/slides.efu");
+
+    // Verify atomic persistence to tasksFile with authoritative allowedRoots
+    const savedConfig = JSON.parse(fs.readFileSync(tasksFile, "utf8"));
+    assert.deepEqual(savedConfig.allowedRoots, [nasRoot]);
+    assert.equal(savedConfig.tasks.length, 1);
+    assert.equal(savedConfig.tasks[0].id, "slides");
+
+    // Duplicate outputName/id returns 409
+    const dupRes = await fetch(`${srv.origin}/api/scans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "重复任务",
+        root: slidesDir,
+        outputName: "slides.efu",
+      }),
+    });
+    assert.equal(dupRes.status, 409);
+
+    // PATCH task name & exportPrefix
+    const patchRes = await fetch(`${srv.origin}/api/scans/slides`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "科研切片归档", exportPrefix: "\\\\nas\\lab-slides" }),
+    });
+    assert.equal(patchRes.status, 200);
+    const patchBody = await patchRes.json();
+    assert.equal(patchBody.task.name, "科研切片归档");
+    assert.equal(patchBody.task.exportPrefix, "\\\\nas\\lab-slides");
+
+    // Trigger real gdu scan on the newly created task
+    const runRes = await fetch(`${srv.origin}/api/scans/slides/run`, { method: "POST" });
+    assert.equal(runRes.status, 202);
+    await manager.waitForIdle(10000);
+
+    const statusBody = await (await fetch(`${srv.origin}/api/scans/slides/status`)).json();
+    assert.equal(statusBody.task.status, "succeeded");
+    assert.equal(statusBody.task.entryCount, 1);
+    const efuPath = path.join(indexDir, "slides.efu");
+    assert.equal(fs.existsSync(efuPath), true);
+    const efuText = fs.readFileSync(efuPath, "utf8");
+    assert.match(efuText, /\\\\nas\\lab-slides\\batch-1\\sample-01\.svs,11,/);
+    assert.ok(!efuText.includes("ignored.svs"));
+
+    // DELETE task definition preserves historical EFU file on disk
+    const delRes = await fetch(`${srv.origin}/api/scans/slides`, { method: "DELETE" });
+    assert.equal(delRes.status, 200);
+    const afterDelList = await (await fetch(`${srv.origin}/api/scans`)).json();
+    assert.equal(afterDelList.tasks.length, 0);
+    assert.equal(fs.existsSync(efuPath), true, "DELETE must NOT delete historical EFU snapshot");
+  } finally {
+    manager.shutdown();
+    await srv.close();
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
 });

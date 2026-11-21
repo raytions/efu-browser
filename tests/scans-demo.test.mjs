@@ -90,3 +90,50 @@ test("ScansDemoService transitions queued -> scanning -> completed and rejects d
     service.dispose();
   }
 });
+
+test("ScansDemoService supports pure-frontend fictional directory browsing and in-memory task CRUD", async () => {
+  const service = ScansDemoService.createDemoScansService();
+  try {
+    const rootsRes = await service.listRoots();
+    assert.equal(rootsRes.ok, true);
+    assert.equal(rootsRes.roots.length, 2);
+
+    const topRes = await service.browseRootEntries("example-nas", "");
+    assert.equal(topRes.ok, true);
+    assert.equal(topRes.data.currentPath, "/mnt/example-nas");
+    assert.ok(topRes.data.entries.some((e) => e.name === "datasets"));
+
+    const subRes = await service.browseRootEntries("example-nas", "datasets");
+    assert.equal(subRes.ok, true);
+    assert.equal(subRes.data.currentPath, "/mnt/example-nas/datasets");
+    assert.equal(subRes.data.parentRelativePath, "");
+    assert.ok(subRes.data.entries.some((e) => e.name === "pathology"));
+
+    // Reject path outside fictional roots
+    const badCreate = await service.createTask({
+      name: "Escape",
+      root: "/etc",
+      outputName: "etc.efu",
+    });
+    assert.equal(badCreate.ok, false);
+
+    // Create valid fictional task in memory
+    const created = await service.createTask({
+      name: "病理切片演示",
+      root: "/mnt/example-nas/datasets/pathology",
+      excludes: [".snapshot"],
+      exportPrefix: "\\\\demo-nas\\pathology",
+      outputName: "pathology.efu",
+    });
+    assert.equal(created.ok, true);
+    assert.equal(created.task.id, "pathology");
+    assert.equal(service.listJobs().length, 2);
+
+    // Delete fictional task
+    const deleted = await service.deleteTask("pathology");
+    assert.equal(deleted.ok, true);
+    assert.equal(service.listJobs().length, 1);
+  } finally {
+    service.dispose();
+  }
+});

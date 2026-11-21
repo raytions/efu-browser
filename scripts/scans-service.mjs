@@ -2,6 +2,8 @@
 import {
   createScansHttpServer,
   createScansManager,
+  deriveScanRootsApiBase,
+  parseAllowedRootsEnv,
   parseBooleanEnv,
 } from "./scans-service-lib.mjs";
 
@@ -17,7 +19,9 @@ function main() {
   const host = (process.env.SCANS_HOST || "127.0.0.1").trim();
   const port = Number.parseInt(process.env.SCANS_PORT || "3001", 10);
   const apiBase = (process.env.SCANS_API_BASE || "/api/scans").trim();
+  const rootsApiBase = (process.env.SCANS_ROOTS_API_BASE || deriveScanRootsApiBase(apiBase)).trim();
   const allowTrigger = parseBooleanEnv(process.env.SCANS_ALLOW_TRIGGER, false);
+  const allowManage = parseBooleanEnv(process.env.SCANS_ALLOW_MANAGE, false);
   const tasksFile = (process.env.SCANS_TASKS_FILE || "/config/scans.json").trim();
   const indexDir = (process.env.SCANS_INDEX_DIR || "/app/indexes").trim();
   const stateFile = (process.env.SCANS_STATE_FILE || "").trim() || null;
@@ -29,13 +33,23 @@ function main() {
     process.exit(2);
   }
 
+  let allowedRoots = null;
+  try {
+    allowedRoots = parseAllowedRootsEnv(process.env.SCANS_ALLOWED_ROOTS);
+  } catch (error) {
+    console.error(`[scans-service] 配置错误：${error.message}`);
+    process.exit(2);
+  }
+
   let manager;
   try {
     manager = createScansManager({
       tasksFile,
+      allowedRoots,
       indexDir,
       stateFile,
       allowTrigger,
+      allowManage,
       gduBin,
       indexUrlPrefix,
     });
@@ -44,7 +58,7 @@ function main() {
     process.exit(1);
   }
 
-  const server = createScansHttpServer(manager, { apiBase });
+  const server = createScansHttpServer(manager, { apiBase, rootsApiBase });
 
   const shutdown = () => {
     manager.shutdown();
@@ -55,7 +69,7 @@ function main() {
 
   server.listen(port, host, () => {
     console.log(
-      `[scans-service] 已启动 | listen=http://${host}:${port}${apiBase} | tasks=${manager.listPublicTasks().length} | allowTrigger=${manager.allowTrigger}`
+      `[scans-service] 已启动 | listen=http://${host}:${port}${apiBase} | roots=${manager.listAllowedRoots().length} | tasks=${manager.listPublicTasks().length} | allowTrigger=${manager.allowTrigger} | allowManage=${manager.allowManage}`
     );
   });
 }
